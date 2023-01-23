@@ -6,7 +6,7 @@ from scipy.ndimage import gaussian_filter
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from sklearn.cluster import AgglomerativeClustering
-
+# Change
 plt.style.use('tableau-colorblind10')
 
 file_name = 'phy_folder_for_ES029_2022-09-14_bot72_0'
@@ -243,14 +243,11 @@ if exp_exits[-1] < exp_all_entries[-1]:
 ind = min_dif(exp_first_entries, exp_exits, return_index=True)[0]
 exp_first_exits = exp_exits[ind]
 
-# In[7]:
-
 
 exponential_first_entries = return_ms_indexing(exp_first_entries)
 exponential_first_exits = return_ms_indexing(exp_first_exits)
 prob_df = events[(events['key'] == 'probability')]
 
-# In[8]:
 
 
 trial_information = []
@@ -260,9 +257,6 @@ for tr in range(num_trials - 1):
                                                          rewards_idxs)
     block = np.unique(events[(events['trial'] == tr) & (events['port'] == 1)]['phase'].values)
     trial_information.append([tr_reward_times, tr_start, tr_end, block, tr_idx])
-
-# In[9]:
-
 
 tolerance = 0.01
 trial_probs = []
@@ -279,9 +273,6 @@ for tr in range(num_trials - 1):
 for tr in range(num_trials - 1):
     flat_probs = [item for sublist in trial_probs[tr] for item in sublist]
     trial_information[tr].append(flat_probs)
-
-# In[10]:
-
 
 columns = ['start_time', 'stop_time', 'trial_number', 'trial_time', 'interval_type', 'block', 'reward_probability',
            'spike_trains', 'recent_reward_rate']
@@ -308,14 +299,6 @@ for tr in range(1, (num_trials - 1)):
             [look_back_time, data[0] / 1000 - events[(events['key'] == 'reward') & (events['value'] == 1)].time.min()])
         data.append(recent_rewards / recent_time)
         df = pd.concat([df, pd.DataFrame([data], columns=columns)])
-
-# In[11]:
-
-
-df.head()
-
-# In[12]:
-
 
 normalized_spikes = []
 for i in range(len(df)):
