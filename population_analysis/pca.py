@@ -3,6 +3,9 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import normalize
 from scipy.ndimage import gaussian_filter
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
+from sklearn.cluster import AgglomerativeClustering
 
 plt.style.use('tableau-colorblind10')
 
@@ -15,9 +18,6 @@ events = pd.read_pickle(
 cluster_info = pd.read_pickle(
     f'/Users/baldomeroramirez/Documents/Shuler Rotation/neuropixel-analysis-main/data_saves/{file_name}/cluster_info.pkl')
 
-# In[3]:
-
-
 good_clusters = cluster_info.loc[cluster_info['group'] == 'good'].id.to_numpy()
 num_trials = int(np.nanmax(events.trial.values))
 min_time = min(spikes['time'].to_numpy())
@@ -26,9 +26,6 @@ session_end = np.round(max(spikes['time'].to_numpy()), 4)
 step_size = 0.001  # ms
 time_vector = np.arange(session_start, session_end, step=step_size)
 exp_events = events.loc[events['port'] == 1]
-
-
-# In[4]:
 
 
 # Returns array of length 'time_vector' populated with 1's where spiking events occurred. By cluster.
@@ -96,9 +93,14 @@ def rewards_by_trial(start, end, rewards_idxs):
 
 
 # Bins.
-def binning(arr, bin_size=10):
-    binned_array = np.round(arr / bin_size).astype(int)
-    return binned_array
+def bin_matrix(matrix_in, bin_size=100):
+    num_bins = round(len(matrix_in[0]) / bin_size)
+    matrix_out = np.array_split(matrix_in, num_bins, axis=1)
+    matrix_list = []
+    for i in range(num_bins):
+        matrix_list.append(np.mean(matrix_out[i], axis=1))
+    matrix_out = np.asarray(matrix_list).T
+    return matrix_out
 
 
 # Sorts, pads, and stacks array of arrays.
@@ -210,35 +212,11 @@ def get_categorical_matrix(column, parse_by, return_whole=False):
     return im_matrix, active_intervals
 
 
-#     for i in range(len(good_clusters)):
-#         cluster_now = []
-#         for tr in range(len(df[df[column] == parse_by]) - 1):
-#             first = df[df[column] == parse_by]['spike_trains'].values[tr][i]
-#             cluster_now.append(first)
-#         by_units.append(cluster_now)
-
-#     im_matrix = []
-#     actives = []
-#     for i in range(len(good_clusters)):
-#         bulk, summed = pad_stack_array(by_units[i])
-#         active = get_actives(by_units[i])
-#         im_matrix.append(summed / active)
-#         actives.append(active)
-
-#     return im_matrix, actives
-
-
-# In[5]:
-
-
 spikes_by_cluster = get_all_spikes(good_clusters, time_vector)
 rewards = get_all_rewards(time_vector)[0]
 rewards_idxs = np.where(rewards == 1)[0]
 stacked_spikes = np.vstack(spikes_by_cluster)
 tot_spikes_by_cluster = np.mean(stacked_spikes, axis=1)
-
-# In[6]:
-
 
 # When the exponential port becomes avaibale.
 exp_available = events.loc[(events['key'] == 'forced_switch')].time.to_numpy()
@@ -477,15 +455,8 @@ pca_matrix = np.asarray(pca_list).T
 
 plt.imshow(im_matrix[inds, :1000], aspect='auto')
 
+
 # In[31]:
-
-
-from sklearn.preprocessing import StandardScaler
-from sklearn.decomposition import PCA
-from sklearn.cluster import AgglomerativeClustering
-
-
-# In[34]:
 
 
 def pca(data_bins):
@@ -499,29 +470,17 @@ def pca(data_bins):
     return X_r, x, pca_model
 
 
-# In[35]:
-
-
 pca_results, scaled_data, pca_model = pca(pca_matrix)
 labels = AgglomerativeClustering(4).fit_predict(pca_results)
-
-# In[36]:
-
 
 plt.scatter(pca_results[:, 0], pca_results[:, 1])
 plt.plot()
 plt.grid()
 
-# In[37]:
-
-
 # Label to color dict
 label_color_dict = {0: 'orange', 1: 'black', 2: 'blue', 3: 'magenta'}
 # Color vector creation
 cvec = [label_color_dict[label] for label in labels]
-
-# In[38]:
-
 
 for i in range(len(good_clusters)):
     plt.scatter(pca_results[i, 0], pca_results[i, 1], color=cvec[i])
@@ -529,15 +488,10 @@ plt.grid()
 
 # ## Average activity of units by label
 
-# In[39]:
-
 
 label_masks = []
 for i in range(len(np.unique(labels))):
     label_masks.append(labels == i)
-
-# In[40]:
-
 
 fig, axs = plt.subplots(2, 2, figsize=(10, 5))
 axs[0, 0].plot(np.mean(pca_matrix[label_masks[0]], axis=0))
@@ -555,23 +509,7 @@ axs[1, 1].set_title('Label 4')
 fig.tight_layout()
 plt.show()
 
-
-# In[41]:
-
-
-def bin_matrix(matrix_in, bin_size=100):
-    num_bins = round(len(matrix_in[0]) / bin_size)
-    matrix_out = np.array_split(matrix_in, num_bins, axis=1)
-    matrix_list = []
-    for i in range(num_bins):
-        matrix_list.append(np.mean(matrix_out[i], axis=1))
-    matrix_out = np.asarray(matrix_list).T
-    return matrix_out
-
-
 # ## Block
-
-# In[42]:
 
 
 fig, axs = plt.subplots(2, 2, figsize=(10, 5))
@@ -591,9 +529,6 @@ fig.tight_layout()
 axs[0, 1].legend()
 plt.show()
 
-# In[43]:
-
-
 figure, axis = plt.subplots(2, figsize=(15, 15))
 axis[0].imshow(matrix_sorted_b1[label_masks[1]], vmin=0, vmax=np.quantile(to_imshow, .99), aspect='auto')
 axis[0].set_title("strt_reward")
@@ -602,8 +537,6 @@ axis[1].set_title("reward_reward")
 plt.show()
 
 # ## Recent Reward Rate
-
-# In[44]:
 
 
 matrix_rr1, actives_rr1 = get_quantitative_matrix('recent_reward_rate',
@@ -619,16 +552,10 @@ matrix_rr4, actives_rr4 = get_quantitative_matrix('recent_reward_rate',
                                                   np.quantile(df['recent_reward_rate'].values, 0.75),
                                                   np.quantile(df['recent_reward_rate'].values, 1.0))
 
-# In[45]:
-
-
 matrix_sorted_rr1 = np.array(matrix_rr1)[inds]
 matrix_sorted_rr2 = np.array(matrix_rr2)[inds]
 matrix_sorted_rr3 = np.array(matrix_rr3)[inds]
 matrix_sorted_rr4 = np.array(matrix_rr4)[inds]
-
-# In[46]:
-
 
 fig, axs = plt.subplots(2, 2, figsize=(10, 5))
 axs[0, 0].plot(np.mean(bin_matrix(matrix_sorted_rr1)[label_masks[0]], axis=0))
@@ -662,8 +589,6 @@ plt.show()
 
 # ## Time in Trial
 
-# In[47]:
-
 
 matrix_tt1, actives_tt1 = get_quantitative_matrix('trial_time', np.quantile(df['trial_time'].values, 0.0),
                                                   np.quantile(df['trial_time'].values, 0.25))
@@ -674,16 +599,10 @@ matrix_tt3, actives_tt3 = get_quantitative_matrix('trial_time', np.quantile(df['
 matrix_tt4, actives_tt4 = get_quantitative_matrix('trial_time', np.quantile(df['trial_time'].values, 0.75),
                                                   np.quantile(df['trial_time'].values, 1.0))
 
-# In[48]:
-
-
 matrix_sorted_tt1 = np.array(matrix_tt1)[inds]
 matrix_sorted_tt2 = np.array(matrix_tt2)[inds]
 matrix_sorted_tt3 = np.array(matrix_tt3)[inds]
 matrix_sorted_tt4 = np.array(matrix_tt4)[inds]
-
-# In[49]:
-
 
 fig, axs = plt.subplots(2, 2, figsize=(10, 5))
 axs[0, 0].plot(np.mean(bin_matrix(matrix_sorted_tt1)[label_masks[0]], axis=0))
@@ -717,45 +636,25 @@ plt.show()
 
 # ## Time in Session
 
-# In[50]:
-
 
 where_change_arr = df['block'].values[:-1] != df['block'].values[1:]
 np.where(where_change_arr == 1)[0]
 
-# In[51]:
-
-
 block_idxs = np.zeros(len(df['block']))
-
-# In[52]:
-
 
 block_idxs[:121] = 1
 block_idxs[121:240] = 2
 block_idxs[240:] = 3
 
-# In[53]:
-
-
 df['block_idxs'] = block_idxs
-
-# In[54]:
-
 
 matrix_bid1, actives_bid1 = get_categorical_matrix('block_idxs', 1)
 matrix_bid2, actives_bid2 = get_categorical_matrix('block_idxs', 2)
 matrix_bid3, actives_bid3 = get_categorical_matrix('block_idxs', 3)
 
-# In[55]:
-
-
 matrix_sorted_bid1 = np.array(matrix_bid1)[inds]
 matrix_sorted_bid2 = np.array(matrix_bid2)[inds]
 matrix_sorted_bid3 = np.array(matrix_bid3)[inds]
-
-# In[56]:
-
 
 fig, axs = plt.subplots(2, 2, figsize=(10, 5))
 axs[0, 0].plot(np.mean(bin_matrix(matrix_sorted_bid1)[label_masks[0]], axis=0))
@@ -785,13 +684,8 @@ plt.show()
 
 # ## How fast?
 
-# In[57]:
-
 
 pca_results, scaled_data, pca_transpose_model = pca(pca_matrix.T)
-
-# In[64]:
-
 
 weights = np.arange(len(pca_results[:, 0]))
 weights = np.flip(weights)
@@ -800,9 +694,6 @@ plt.scatter(pca_results[:, 0], pca_results[:, 1], c=weights, cmap='Greys', marke
 plt.grid()
 plt.legend()
 plt.show()
-
-# In[66]:
-
 
 b1_proj_pca = pca_transpose_model.transform(bin_matrix(matrix_sorted_b1).T)
 b2_proj_pca = pca_transpose_model.transform(bin_matrix(matrix_sorted_b2).T)
@@ -820,47 +711,27 @@ plt.show()
 
 # ## Curve-Fitting of Sorts
 
-# In[68]:
-
 
 session_pc_1 = pca_results[:, 0]
 session_pc_2 = pca_results[:, 1]
-
-# In[69]:
-
 
 fig, axs = plt.subplots(2, figsize=(10, 5))
 axs[0].plot(session_pc_1, 'o')
 axs[1].plot(session_pc_2, 'o')
 plt.show()
 
-# In[70]:
-
-
 x = np.arange(len(session_pc_1))
 z = np.polyfit(x, session_pc_1, 7)
 p = np.poly1d(z)
 
-# In[71]:
-
-
 plt.plot(p(x), '--', session_pc_1, 'o')
 plt.show()
-
-# In[72]:
-
 
 z_2 = np.polyfit(x, session_pc_2, 7)
 p_2 = np.poly1d(z_2)
 
-# In[73]:
-
-
 plt.plot(p_2(x), '--', session_pc_2, 'o')
 plt.show()
-
-# In[77]:
-
 
 to_poly = np.arange(0, 50, 0.1)
 x = p(to_poly)
@@ -878,25 +749,21 @@ def fit_curve(principal_component, poly_degree=7):
     return p, x
 
 
-# In[96]:
-
-
 pc = 1
 p, x = fit_curve(pca_results[:, pc])
 plt.plot(p(x), '--', pca_results[:, pc], 'o')
 plt.show()
-
-# In[105]:
-
 
 pc = 1
 p, x = fit_curve(b1_proj_pca[:, pc])
 plt.plot(p(x), '--', b1_proj_pca[:, pc], 'o')
 plt.show()
 
+
 # In[ ]:
 def run_pca_analysis():
     pass
+
 
 if __name__ == '__main__':
     run_pca_analysis()
