@@ -1,2 +1,2 @@
-from .get_file_list import get_file_list
+from .get_session_list import get_session_list
 from .load_data import load_data
