@@ -1,11 +1,12 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from sklearn.preprocessing import normalize
+# from sklearn.preprocessing import normalize
 from scipy.ndimage import gaussian_filter
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from sklearn.cluster import AgglomerativeClustering
+
 # Change
 plt.style.use('tableau-colorblind10')
 
@@ -136,36 +137,6 @@ def slice_spikes(start, end):
     return sliced_stack
 
 
-###
-def plot_heat_map(column, parse_by, gauss_sigma, last_bin):
-    column = column
-    parse_by = parse_by
-    by_units = []
-    for i in range(len(good_clusters)):
-        cluster_now = []
-        for tr in range(len(df[df['interval_type'] == parse_by]) - 1):
-            first = df[df[column] == parse_by]['spike_trains'].values[tr][i]
-            cluster_now.append(first)
-        by_units.append(cluster_now)
-
-    im_matrix = []
-    for i in range(len(good_clusters)):
-        bulk, summed = pad_stack_array(by_units[i])
-        im_matrix.append(summed / get_actives(by_units[i]))
-
-    normalized_matrix = normalize(im_matrix, axis=1)
-    filtered_matrix = np.vstack([gaussian_filter(vector, gauss_sigma) for vector in normalized_matrix])
-    inds = np.argsort(np.argmax(filtered_matrix, axis=1))
-    im_matrix = normalized_matrix[inds]
-    im_matrix = im_matrix[:, :last_bin]
-
-    plt.figure(figsize=(15, 10))
-    plt.imshow(im_matrix, vmin=0, vmax=(np.quantile(im_matrix[:, :int(len(im_matrix[0]) / 2)], .99)), aspect='auto')
-    plt.colorbar()
-    plt.show()
-
-
-###
 def get_quantitative_matrix(column, lower_bound, upper_bound):
     column = column
     lower_bound = lower_bound
@@ -190,7 +161,6 @@ def get_quantitative_matrix(column, lower_bound, upper_bound):
     return im_matrix, actives
 
 
-###
 def get_categorical_matrix(column, parse_by, return_whole=False):
     column = column
     parse_by = parse_by
@@ -218,9 +188,9 @@ rewards_idxs = np.where(rewards == 1)[0]
 stacked_spikes = np.vstack(spikes_by_cluster)
 tot_spikes_by_cluster = np.mean(stacked_spikes, axis=1)
 
-# When the exponential port becomes avaibale.
+# When the exponential port becomes available.
 exp_available = events.loc[(events['key'] == 'forced_switch')].time.to_numpy()
-# When the mouse enters the expornential port.
+# When the mouse enters the exponential port.
 exp_entries = events.loc[(events['key'] == 'head') & (events['value'] == 1) & (events['port'] == 1)].time.to_numpy()
 # When the mouse exists the exponential port.
 exp_exits = events.loc[(events['key'] == 'head') & (events['value'] == 0) & (events['port'] == 1)].time.to_numpy()
@@ -243,13 +213,11 @@ if exp_exits[-1] < exp_all_entries[-1]:
 ind = min_dif(exp_first_entries, exp_exits, return_index=True)[0]
 exp_first_exits = exp_exits[ind]
 
-
 exponential_first_entries = return_ms_indexing(exp_first_entries)
 exponential_first_exits = return_ms_indexing(exp_first_exits)
 prob_df = events[(events['key'] == 'probability')]
 
-
-
+# Get trial information trial rewards times, starts, ends, and blocks
 trial_information = []
 for tr in range(num_trials - 1):
     tr_idx = tr
@@ -258,6 +226,7 @@ for tr in range(num_trials - 1):
     block = np.unique(events[(events['trial'] == tr) & (events['port'] == 1)]['phase'].values)
     trial_information.append([tr_reward_times, tr_start, tr_end, block, tr_idx])
 
+# Get reward probabilities
 tolerance = 0.01
 trial_probs = []
 for tr in range(num_trials - 1):
@@ -270,10 +239,12 @@ for tr in range(num_trials - 1):
         probs_tr.append(prob_now)
     trial_probs.append(probs_tr)
 
+# Append flattened reward probabilities to trial_information list
 for tr in range(num_trials - 1):
     flat_probs = [item for sublist in trial_probs[tr] for item in sublist]
     trial_information[tr].append(flat_probs)
 
+# Make session data frame.
 columns = ['start_time', 'stop_time', 'trial_number', 'trial_time', 'interval_type', 'block', 'reward_probability',
            'spike_trains', 'recent_reward_rate']
 df = pd.DataFrame(columns=columns)
@@ -300,44 +271,22 @@ for tr in range(1, (num_trials - 1)):
         data.append(recent_rewards / recent_time)
         df = pd.concat([df, pd.DataFrame([data], columns=columns)])
 
+# Append normalized spikes to session dataframe.
 normalized_spikes = []
 for i in range(len(df)):
     normalized_spikes.append(df['spike_trains'].iloc[i].T / tot_spikes_by_cluster)
 
-# In[13]:
-
-
 df['normalized_spike_trains'] = normalized_spikes
-
-# In[14]:
-
-
-df['normalized_spike_trains1'] = df['spike_trains'].map(lambda x: x.T / tot_spikes_by_cluster)
-
-# In[15]:
-
 
 im_matrix, actives = get_categorical_matrix('normalized_spike_trains', 'start_reward', return_whole=True)
 
-# In[16]:
-
-
 last_bin = np.max(np.where(np.array(actives) > actives[0] * (0.2)))
 
-# In[17]:
-
-
 np.shape(im_matrix[:, :last_bin])
-
-# In[18]:
-
 
 filtered_matrix = np.vstack([gaussian_filter(vector, 50) for vector in im_matrix[:, :last_bin]])
 inds = np.argsort(np.argmax(filtered_matrix, axis=1))
 to_imshow = im_matrix[inds]
-
-# In[19]:
-
 
 plt.figure(figsize=(5, 5))
 plt.imshow(to_imshow, vmin=0, vmax=np.quantile(to_imshow, .99), aspect='auto')
@@ -345,22 +294,14 @@ plt.show()
 
 # ## Plotting
 
-# In[20]:
-
 
 matrix_sr, actives_sr = get_categorical_matrix('interval_type', 'start_reward')
 matrix_rr, actives_rr = get_categorical_matrix('interval_type', 'reward_reward')
 matrix_er, actives_er = get_categorical_matrix('interval_type', 'reward_end')
 
-# In[21]:
-
-
 matrix_sorted_sr = np.array(matrix_sr)[inds]
 matrix_sorted_rr = np.array(matrix_rr)[inds]
 matrix_sorted_er = np.array(matrix_er)[inds]
-
-# In[22]:
-
 
 sr = np.shape(matrix_sorted_sr)[1]
 rr = np.shape(matrix_sorted_rr)[1]
@@ -372,9 +313,6 @@ er_to_pad = np.zeros((len(good_clusters), er_pad))
 matrix_sorted_sr = np.concatenate((matrix_sorted_sr, sr_to_pad), axis=1)
 matrix_sorted_er = np.concatenate((matrix_sorted_er, er_to_pad), axis=1)
 
-# In[23]:
-
-
 figure, axis = plt.subplots(3, figsize=(15, 15))
 axis[0].imshow(matrix_sorted_sr, vmin=0, vmax=np.quantile(to_imshow, .99), aspect='auto')
 axis[0].set_title("strt_reward")
@@ -384,29 +322,17 @@ axis[2].imshow(matrix_sorted_er, vmin=0, vmax=np.quantile(to_imshow, .99), aspec
 axis[2].set_title("end_reward")
 plt.show()
 
-# In[24]:
-
-
 matrix_b1, actives_b1 = get_categorical_matrix('block', '0.4')
 matrix_b2, actives_b2 = get_categorical_matrix('block', '0.8')
 
-# In[25]:
-
-
 matrix_sorted_b1 = np.array(matrix_b1)[inds]
 matrix_sorted_b2 = np.array(matrix_b2)[inds]
-
-# In[26]:
-
 
 b1 = np.shape(matrix_sorted_b1)[1]
 b2 = np.shape(matrix_sorted_b2)[1]
 b2_pad = b1 - b2
 b2_to_pad = np.zeros((len(good_clusters), b2_pad))
 matrix_sorted_b2 = np.concatenate((matrix_sorted_b2, b2_to_pad), axis=1)
-
-# In[27]:
-
 
 figure, axis = plt.subplots(2, figsize=(15, 15))
 axis[0].imshow(matrix_sorted_b1, vmin=0, vmax=np.quantile(to_imshow, .99), aspect='auto')
@@ -417,9 +343,6 @@ plt.show()
 
 # ## Dimensionality Reduction - PCA
 
-# In[28]:
-
-
 # 100ms time bins
 pca_matrix = im_matrix[inds]
 num_bins = round(len(pca_matrix[0]) / 100)
@@ -428,18 +351,9 @@ pca_list = []
 for i in range(num_bins):
     pca_list.append(np.mean(pca_matrix[i], axis=1))
 
-# In[29]:
-
-
 pca_matrix = np.asarray(pca_list).T
 
-# In[30]:
-
-
 plt.imshow(im_matrix[inds, :1000], aspect='auto')
-
-
-# In[31]:
 
 
 def pca(data_bins):
@@ -681,9 +595,6 @@ plt.show()
 b1_proj_pca = pca_transpose_model.transform(bin_matrix(matrix_sorted_b1).T)
 b2_proj_pca = pca_transpose_model.transform(bin_matrix(matrix_sorted_b2).T)
 
-# In[99]:
-
-
 plt.figure(figsize=(10, 5))
 plt.scatter(b1_proj_pca[:, 0], b1_proj_pca[:, 1], c=weights, cmap='Greys', marker='o')
 plt.scatter(b2_proj_pca[:, 0], b2_proj_pca[:, 1], c=weights, cmap='Blues', marker='o')
@@ -743,7 +654,6 @@ plt.plot(p(x), '--', b1_proj_pca[:, pc], 'o')
 plt.show()
 
 
-# In[ ]:
 def run_pca_analysis():
     pass
 
