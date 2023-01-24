@@ -364,6 +364,29 @@ def plot_heat_map(df, good_clusters, split_by='block', split_type='cat'):
     return None
 
 
+# P.C.A.
+def pca(data_bins):
+    x = data_bins
+    scaler = StandardScaler()
+    x = scaler.fit_transform(x.T)
+    scaler = StandardScaler()
+    x = scaler.fit_transform(x.T)
+    pca_model = PCA(n_components=0.99)
+    X_r = pca_model.fit_transform(x)
+    return X_r, x, pca_model
+
+
+def pca_labels(df, num_clusters=4):
+    im_matrix = get_inds(df)[2]
+    pca_matrix = bin_matrix(im_matrix)
+    pca_results, scaled_data, pca_model = pca(pca_matrix)
+    labels = AgglomerativeClustering(num_clusters).fit_predict(pca_results)
+    label_masks = []
+    for i in range(len(np.unique(labels))):
+        label_masks.append(labels == i)
+    return labels, label_masks
+
+
 good_clusters, num_trials, time_vector, prob_df, tot_spikes_by_cluster, min_time, rewards_idxs, stacked_spikes = get_session_info(
     cluster_info, events, spikes)
 exp_entry, exp_exit = get_exp_entries_exits(events)
