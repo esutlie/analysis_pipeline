@@ -292,7 +292,7 @@ plt.figure(figsize=(5, 5))
 plt.imshow(to_imshow, vmin=0, vmax=np.quantile(to_imshow, .99), aspect='auto')
 plt.show()
 
-# ## Plotting
+# Plotting
 
 
 matrix_sr, actives_sr = get_categorical_matrix('interval_type', 'start_reward')
