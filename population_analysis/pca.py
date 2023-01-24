@@ -533,15 +533,15 @@ plt.show()
 
 # ## Time in Session
 
-
+# Note where blocks changes and create np.array with 1,2, and 3's to denote changes and break session into three parts.
 where_change_arr = df['block'].values[:-1] != df['block'].values[1:]
-np.where(where_change_arr == 1)[0]
+block_changes = np.where(where_change_arr ==  1)[0]
 
 block_idxs = np.zeros(len(df['block']))
 
-block_idxs[:121] = 1
-block_idxs[121:240] = 2
-block_idxs[240:] = 3
+block_idxs[:block_changes[1]] = 1
+block_idxs[block_changes[1]:block_changes[2]] = 2
+block_idxs[block_changes[3]:] = 3
 
 df['block_idxs'] = block_idxs
 
