@@ -387,6 +387,50 @@ def pca_labels(df, num_clusters=4):
     return labels, label_masks
 
 
+# Plots activity by pca label
+def average_activity_by_label(df, label_masks, split_by='block', split_type='cat'):
+    if split_type == 'cat':
+        splits = np.unique(df[split_by])
+        matrices = []
+        for i in splits:
+            m, a = get_categorical_matrix(df, split_by, i)
+            matrices.append(m)
+        fig, axs = plt.subplots(2, 2, figsize=(10, 5))
+        axs = axs.ravel()
+        for i in range(len(label_masks)):
+            axs[i].plot(np.mean(bin_matrix(matrices[0])[label_masks[i]], axis=0), label='B1 0.4')
+            axs[i].plot(np.mean(bin_matrix(matrices[1])[label_masks[i]], axis=0), label='B2 0.8')
+        fig.suptitle(split_by)
+        axs[1].legend()
+
+    else:
+        first_q = np.quantile(df[split_by], [0, 0.25])
+        second_q = np.quantile(df[split_by], [0.25, 0.50])
+        third_q = np.quantile(df[split_by], [0.50, 0.75])
+        fourth_q = np.quantile(df[split_by], [0.75, 1.0])
+        all_qs = [first_q, second_q, third_q, fourth_q]
+
+        matrices = []
+        for i in range(len(all_qs)):
+            m, a = get_quantitative_matrix(df, split_by, all_qs[i][0], all_qs[i][1])
+            matrices.append(m)
+        fig, axs = plt.subplots(2, 2, figsize=(10, 5))
+        axs = axs.ravel()
+        for i in range(len(label_masks)):
+            m1 = np.array(matrices[0])[label_masks[i]]
+            m2 = np.array(matrices[1])[label_masks[i]]
+            m3 = np.array(matrices[2])[label_masks[i]]
+            m4 = np.array(matrices[3])[label_masks[i]]
+            axs[i].plot(np.mean(bin_matrix(m1), axis=0), label='q1')
+            axs[i].plot(np.mean(bin_matrix(m2), axis=0), label='q2')
+            axs[i].plot(np.mean(bin_matrix(m3), axis=0), label='q3')
+            axs[i].plot(np.mean(bin_matrix(m4), axis=0), label='q4')
+        axs[1].legend()
+        fig.suptitle(split_by)
+
+    return None
+
+
 good_clusters, num_trials, time_vector, prob_df, tot_spikes_by_cluster, min_time, rewards_idxs, stacked_spikes = get_session_info(
     cluster_info, events, spikes)
 exp_entry, exp_exit = get_exp_entries_exits(events)
