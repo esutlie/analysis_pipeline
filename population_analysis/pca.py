@@ -6,6 +6,9 @@ from scipy.ndimage import gaussian_filter
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from sklearn.cluster import AgglomerativeClustering
+from shapely import LineString
+from shapely.geometry import Point
+from shapely.ops import nearest_points
 
 # Change
 plt.style.use('tableau-colorblind10')
@@ -549,6 +552,16 @@ def get_categorical_matrix_two_params(df, column_1, column_2, parse_by_1, parse_
     im_matrix = im_matrix / np.array(active_intervals)
 
     return im_matrix, active_intervals
+
+def fit_pcs(pca_results):
+    poly_results = []
+    time_poly = np.arange(0, 50, 0.01)
+    polynomials = []
+    for pc in range(2):
+        p, x = fit_curve(pca_results[:,pc])
+        poly_results.append(p(time_poly))
+        polynomials.append(p)
+    return polynomials
 
 
 good_clusters, num_trials, time_vector, prob_df, tot_spikes_by_cluster, min_time, rewards_idxs, stacked_spikes = get_session_info(
