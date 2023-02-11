@@ -51,7 +51,17 @@ def get_session_info(cluster_info, events, spikes):
     return good_clusters, num_trials, time_vector, prob_df, tot_spikes_by_cluster, min_time, rewards_idxs, stacked_spikes
 
 
-# Returns array of length time_vector populated with 1's where reward events occurred.
+# Returns array of length time_vector populated with 1's where lick events occurred
+def get_all_licks(time_vector, step_size=0.001):
+    min_time = min(spikes['time'].to_numpy())
+    lick_bools = []
+    bool_vector = np.zeros(len(time_vector))
+    for t in events[(events['key'] == 'lick') & (events['value'] == 1) & (events['port'] == 1)].time.to_numpy():
+        bool_vector[int((t - min_time) / step_size)] = 1
+    lick_bools.append(bool_vector)
+    return lick_bools
+
+
 def get_all_rewards(time_vector, step_size=0.001):
     min_time = min(spikes['time'].to_numpy())
     reward_bools = []
@@ -60,6 +70,31 @@ def get_all_rewards(time_vector, step_size=0.001):
         bool_vector[int((t - min_time) / step_size)] = 1
     reward_bools.append(bool_vector)
     return reward_bools
+
+
+# Returns array of length time_vector populated with 1's where reward events occurred.
+def get_rewards(time_vector, step_size=0.001):
+    min_time = min(spikes['time'].to_numpy())
+    reward_bools = []
+    bool_vector = np.zeros(len(time_vector))
+    for t in events[(events['key'] == 'reward') & (events['value'] == 1) & (events['port'] == 1)].time.to_numpy():
+        bool_vector[int((t - min_time) / step_size)] = 1
+    reward_bools.append(bool_vector)
+
+    licks = get_all_licks(time_vector)[0]
+    where_rwrds = np.where(reward_bools[0] == True)[0]
+    where_licks = np.where(licks == True)[0]
+    reward_aft_times = []
+    for i in range(len(where_rwrds)):
+        out = min(np.where(where_licks > where_rwrds[i])[0])
+        reward_aft_times.append(out)
+
+    zeros = np.zeros(len(time_vector))
+    zeros[where_licks[reward_aft_times]] = 1
+    adjusted_reward_times = []
+    adjusted_reward_times.append(zeros)
+
+    return reward_bools, adjusted_reward_times
 
 
 # Time since last event.
@@ -97,12 +132,10 @@ def get_trial_times(trial_idx):
 
 
 # Returns instances where a rewards occurred in a given trial.
-def rewards_by_trial(start, end, rewards_idxs):
-    start = start
-    end = end
-    mask = np.logical_and(rewards_idxs > start, rewards_idxs < end)
-    rewards_times = rewards_idxs[mask]
-    return rewards_times, start, end
+def rewards_by_trial(start, end, reward_idxs):
+    mask = np.logical_and(reward_idxs > start, reward_idxs <= end)
+    reward_times = reward_idxs[mask]
+    return reward_times, start, end
 
 
 # Bins matrix by given bin_size value.
@@ -204,12 +237,17 @@ def get_exp_entries_exits(events, tolerance=1):
     exp_entries = events.loc[(events['key'] == 'head') & (events['value'] == 1) & (events['port'] == 1)].time.to_numpy()
     # When the mouse exists the exponential port.
     exp_exits = events.loc[(events['key'] == 'head') & (events['value'] == 0) & (events['port'] == 1)].time.to_numpy()
-
-    # Get clean first entry/exit times to exponential port.
     tol = tolerance
+    print(exp_available)
+    print(exp_entries)
     dif = min_dif(exp_entries, exp_exits)
+    # print(len(exp_entries), len(exp_exits))
+    exp_entries = exp_entries[:-1]
+    # print(len(exp_entries), len(exp_exits))
     exp_entries = exp_entries[np.where(dif > tol)]
+    # print(len(exp_entries), len(exp_entries))
     ind = min_dif(exp_available, exp_entries, return_index=True)[0]
+    # print(ind)
     exp_first_entries = exp_entries[ind]
 
     exp_all_entries = events.loc[
@@ -231,23 +269,33 @@ def get_exp_entries_exits(events, tolerance=1):
 
 # Returns list with the information of all trials (strt, end, rwrd_times, etc.)
 def get_trial_information(num_trials, exponential_first_entries, exponential_first_exits, prob_df, tolerance=0.01):
+    prob_rewards = np.where(get_rewards(time_vector)[0][0] == 1)[0]
+    lick_adjusted_rewards = np.where(get_rewards(time_vector)[1][0] == 1)[0]
+
     trial_information = []
+    prob_information = []
     for tr in range(num_trials - 1):
         tr_idx = tr
         tr_reward_times, tr_start, tr_end = rewards_by_trial(exponential_first_entries[tr], exponential_first_exits[tr],
-                                                             rewards_idxs)
+                                                             lick_adjusted_rewards)
         block = np.unique(events[(events['trial'] == tr) & (events['port'] == 1)]['phase'].values)
         trial_information.append([tr_reward_times, tr_start, tr_end, block, tr_idx])
+        prob_information.append(
+            rewards_by_trial(exponential_first_entries[tr], exponential_first_exits[tr], prob_rewards))
 
-    tolerance = 0.01
+    tolerance = 0.05
     trial_probs = []
     for tr in range(num_trials - 1):
-        trial_rwrds = trial_information[tr][0]
+        trial_rwrds = prob_information[tr][0]
         probs_tr = []
         for i in range(len(trial_rwrds)):
             rwrd_time_now = round(trial_rwrds[i] / 1000, 3)
             prob_now = prob_df[
                 (prob_df['time'] >= rwrd_time_now) & (prob_df['time'] < (rwrd_time_now + tolerance))].value.values
+            if not len(prob_now) == 1:
+                print(prob_now)
+                print(rwrd_time_now)
+                print(prob_df[(prob_df['time'] >= rwrd_time_now - 1) & (prob_df['time'] < (rwrd_time_now + 1))])
             probs_tr.append(prob_now)
         trial_probs.append(probs_tr)
 
@@ -271,10 +319,12 @@ def create_data_frame(num_trials, trial_information, look_back_time=60):
         for j in range(len(rwrd_times) + 1):
             if j == 0 and len(rwrd_times):
                 data = [tr_start, rwrd_times[0], tr_idx, 0, 'start_reward', tr_block, 0.1]
-            elif j == np.max(len(rwrd_times)) and len(rwrd_times):
+            elif j == len(rwrd_times) and len(rwrd_times):
                 data = [rwrd_times[-1], tr_end, tr_idx, rwrd_times[-1] - tr_start, 'reward_end', tr_block,
                         rwrd_probs[-1]]
             elif len(rwrd_times):
+                #                 print(rwrd_times)
+                #                 print(rwrd_probs)
                 data = [rwrd_times[j - 1], rwrd_times[j], tr_idx, rwrd_times[j - 1] - tr_start, 'reward_reward',
                         tr_block, rwrd_probs[j - 1]]
             else:
@@ -310,7 +360,7 @@ def get_inds(df):
     filtered_matrix = np.vstack([gaussian_filter(vector, 50) for vector in im_matrix[:, :last_bin]])
     inds = np.argsort(np.argmax(filtered_matrix, axis=1))
     to_imshow = im_matrix[inds]
-    return inds, to_imshow
+    return inds, to_imshow, im_matrix
 
 
 # Pads matrices for plotting
@@ -330,7 +380,7 @@ def pad_heatmap_matrices(matrices, good_clusters):
 
 # Plots matrices against each other by type.
 def plot_heat_map(df, good_clusters, split_by='block', split_type='cat'):
-    inds, to_imshow = get_inds(df)
+    inds, to_imshow, im_matrix = get_inds(df)
     if split_type == 'cat':
         cat_vals = np.unique(df[split_by])
         sorted_matrices = []
@@ -343,7 +393,7 @@ def plot_heat_map(df, good_clusters, split_by='block', split_type='cat'):
         figure, axis = plt.subplots(num_subs, figsize=(15, 15))
         for s in range(num_subs):
             axis[s].imshow(to_plot[s], vmin=0, vmax=np.quantile(to_imshow, .99), aspect='auto')
-    # If values are quantitative rather than categorical
+    # If values are quantitative (range of vals) rather than categorical
     else:
         sorted_matrices = []
         first_q = np.quantile(df[split_by], [0, 0.25])
@@ -376,6 +426,7 @@ def pca(data_bins):
     return X_r, x, pca_model
 
 
+# Get p.c.a. labels
 def pca_labels(df, num_clusters=4):
     im_matrix = get_inds(df)[2]
     pca_matrix = bin_matrix(im_matrix)
@@ -384,24 +435,48 @@ def pca_labels(df, num_clusters=4):
     label_masks = []
     for i in range(len(np.unique(labels))):
         label_masks.append(labels == i)
-    return labels, label_masks
+    return labels, label_masks, pca_matrix
 
 
 # Plots activity by pca label
 def average_activity_by_label(df, label_masks, split_by='block', split_type='cat'):
-    if split_type == 'cat':
+    if split_by == 'block_idxs':
         splits = np.unique(df[split_by])
         matrices = []
         for i in splits:
             m, a = get_categorical_matrix(df, split_by, i)
             matrices.append(m)
-        fig, axs = plt.subplots(2, 2, figsize=(10, 5))
+        fig, axs = plt.subplots(2, 2, figsize=(10, 5), sharey=True)
+        axs = axs.ravel()
+        for i in range(len(label_masks)):
+            axs[i].plot(np.mean(bin_matrix(matrices[0])[label_masks[i]], axis=0), label='ts1')
+            axs[i].plot(np.mean(bin_matrix(matrices[1])[label_masks[i]], axis=0), label='ts2')
+            axs[i].plot(np.mean(bin_matrix(matrices[2])[label_masks[i]], axis=0), label='ts3')
+            axs[i].grid(axis="y")
+
+        fig.suptitle("%s -- %s" % (split_by, file_name))
+        axs[1].legend()
+        fig.tight_layout()
+        fig.savefig('graphs_hushu_rotation/{}_{}.png'.format(file_name, split_by))
+
+
+    elif split_type == 'cat':
+        splits = np.unique(df[split_by])
+        matrices = []
+        for i in splits:
+            m, a = get_categorical_matrix(df, split_by, i)
+            matrices.append(m)
+        fig, axs = plt.subplots(2, 2, figsize=(10, 5), sharey=True)
         axs = axs.ravel()
         for i in range(len(label_masks)):
             axs[i].plot(np.mean(bin_matrix(matrices[0])[label_masks[i]], axis=0), label='B1 0.4')
             axs[i].plot(np.mean(bin_matrix(matrices[1])[label_masks[i]], axis=0), label='B2 0.8')
-        fig.suptitle(split_by)
+            axs[i].grid(axis="y")
+        fig.suptitle("%s -- %s" % (split_by, file_name))
         axs[1].legend()
+        fig.tight_layout()
+        fig.savefig('graphs_hushu_rotation/{}_{}.png'.format(file_name, split_by))
+
 
     else:
         first_q = np.quantile(df[split_by], [0, 0.25])
@@ -414,7 +489,7 @@ def average_activity_by_label(df, label_masks, split_by='block', split_type='cat
         for i in range(len(all_qs)):
             m, a = get_quantitative_matrix(df, split_by, all_qs[i][0], all_qs[i][1])
             matrices.append(m)
-        fig, axs = plt.subplots(2, 2, figsize=(10, 5))
+        fig, axs = plt.subplots(2, 2, figsize=(10, 5), sharey=True)
         axs = axs.ravel()
         for i in range(len(label_masks)):
             m1 = np.array(matrices[0])[label_masks[i]]
@@ -425,11 +500,43 @@ def average_activity_by_label(df, label_masks, split_by='block', split_type='cat
             axs[i].plot(np.mean(bin_matrix(m2), axis=0), label='q2')
             axs[i].plot(np.mean(bin_matrix(m3), axis=0), label='q3')
             axs[i].plot(np.mean(bin_matrix(m4), axis=0), label='q4')
+            tots_units = np.sum(label_masks[i])
+            axs[i].title.set_text("PCA_label_%d Number of Units: %d" % (i, tots_units))
+            axs[i].grid(axis="y")
         axs[1].legend()
-        fig.suptitle(split_by)
+        fig.suptitle("%s -- %s" % (split_by, file_name))
+        # fig.suptitle(split_by)
+        fig.tight_layout()
+        fig.savefig('graphs_hushu_rotation/{}_{}.png'.format(file_name, split_by))
 
     return None
 
+def fit_curve(principal_component, poly_degree = 7):
+    x = np.arange(len(principal_component))
+    z = np.polyfit(x, principal_component, poly_degree)
+    p = np.poly1d(z)
+    return p, x
+
+
+def get_categorical_matrix_two_params(df, column_1, column_2, parse_by_1, parse_by_2, return_whole=False):
+    # column = column
+    # parse_by = parse_by
+    by_units = []
+
+    if return_whole:
+        spike_arrays = df['spike_trains'].values
+    else:
+        spike_arrays = df[(df[column_1] == parse_by_1) & (df[column_2] == parse_by_2)]['spike_trains'].values
+    array_lengths = [len(arr[0]) for arr in spike_arrays]
+    active_intervals = [sum([val > i for val in array_lengths]) for i in range(max(array_lengths))]
+    im_matrix = np.zeros((len(spike_arrays[0]), len(active_intervals)))
+
+    for arr in spike_arrays:
+        im_matrix[:len(arr), :len(arr[0])] += arr
+
+    im_matrix = im_matrix / np.array(active_intervals)
+
+    return im_matrix, active_intervals
 
 good_clusters, num_trials, time_vector, prob_df, tot_spikes_by_cluster, min_time, rewards_idxs, stacked_spikes = get_session_info(
     cluster_info, events, spikes)
