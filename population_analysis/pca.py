@@ -32,6 +32,17 @@ def get_all_spikes(good_clusters, time_vector, spikes, step_size=0.001):
     return all_bools
 
 
+# Returns array of length time_vector populated with 1's where lick events occurred
+def get_all_licks(time_vector, step_size=0.001):
+    min_time = min(spikes['time'].to_numpy())
+    lick_bools = []
+    bool_vector = np.zeros(len(time_vector))
+    for t in events[(events['key'] == 'lick') & (events['value'] == 1) & (events['port'] == 1)].time.to_numpy():
+        bool_vector[int((t - min_time) / step_size)] = 1
+    lick_bools.append(bool_vector)
+    return lick_bools
+
+
 # Get session information
 def get_session_info(cluster_info, events, spikes):
     good_clusters = cluster_info.loc[cluster_info['group'] == 'good'].id.to_numpy()
@@ -511,7 +522,8 @@ def average_activity_by_label(df, label_masks, split_by='block', split_type='cat
 
     return None
 
-def fit_curve(principal_component, poly_degree = 7):
+
+def fit_curve(principal_component, poly_degree=7):
     x = np.arange(len(principal_component))
     z = np.polyfit(x, principal_component, poly_degree)
     p = np.poly1d(z)
@@ -537,6 +549,7 @@ def get_categorical_matrix_two_params(df, column_1, column_2, parse_by_1, parse_
     im_matrix = im_matrix / np.array(active_intervals)
 
     return im_matrix, active_intervals
+
 
 good_clusters, num_trials, time_vector, prob_df, tot_spikes_by_cluster, min_time, rewards_idxs, stacked_spikes = get_session_info(
     cluster_info, events, spikes)
