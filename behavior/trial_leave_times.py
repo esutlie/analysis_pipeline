@@ -94,4 +94,4 @@ def trial_leave_times(file_list, data_list, save=False, data_only=False):
 if __name__ == '__main__':
     files = backend.get_session_list()
     data = [backend.load_data(session)[1] for session in files]
-    trial_leave_times(files, data, save=True)
+    leave_time_df = trial_leave_times(files, data, save=True)

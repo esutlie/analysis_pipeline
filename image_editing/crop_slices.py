@@ -9,7 +9,7 @@ from scipy.signal import argrelmin, argrelmax
 import math
 
 
-def crop_slices(show_pics=False):
+def crop_slices(show_pics=False, save_pics=False):
     slice_size = [2000, 1500]
     pictures, names = load_pictures()
     mouse_names = [name[:5] for name in names]
@@ -62,11 +62,11 @@ def crop_slices(show_pics=False):
                 mouse_pics[name[:5]] = mouse_pics[name[:5]] + [slice_pic]
                 mouse_pic_names[name[:5]] = mouse_pic_names[name[:5]] + [f'{name}_{count}']
                 count += 1
-                # plt.imshow(slice_pic)
-                # plt.title(name)
-                # plt.show()
+                if save_pics:
+                    im = Image.fromarray(slice_pic)
+                    im.save(os.path.join('pics', f'{name[:-4]}_{count}.jpeg'))
         if show_pics:
-            fig, axes = plt.subplots(2, math.ceil(len(slice_pics)/2))
+            fig, axes = plt.subplots(2, math.ceil(len(slice_pics) / 2))
             axes = [item for sublist in axes for item in sublist]
             for j, ax in enumerate(axes):
                 if len(slice_pics[j]):
@@ -78,4 +78,4 @@ def crop_slices(show_pics=False):
 
 
 if __name__ == '__main__':
-    crop_slices(show_pics=True)
+    crop_slices(show_pics=True, save_pics=True)
