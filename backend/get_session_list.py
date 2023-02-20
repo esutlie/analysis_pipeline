@@ -1,5 +1,5 @@
 import os
-
+import backend
 
 def get_session_list():
     """
@@ -7,7 +7,8 @@ def get_session_list():
     :return: list
     """
     directory_list = []
-    local_path = os.path.join(os.path.dirname(os.getcwd()), 'processed_data')
+    local_path = backend.get_data_path()
+    # local_path = os.path.join(os.path.dirname(os.getcwd()), 'z_sessions')
 
     # Walk through directory
     for root, directories, files in os.walk(local_path):

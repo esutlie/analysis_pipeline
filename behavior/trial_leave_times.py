@@ -1,13 +1,10 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import backend
-from behavior import *
+from get_trial_events import get_trial_events
 import pandas as pd
 import seaborn as sns
-
-set2 = sns.color_palette('Set2')
-set2_dark = [[c * .5 for c in sublist] for sublist in set2]
-colorblind = sns.color_palette('colorblind')
+from sklearn.linear_model import LinearRegression
 
 
 def trial_leave_times(file_list, data_list, save=False, data_only=False):
@@ -22,8 +19,10 @@ def trial_leave_times(file_list, data_list, save=False, data_only=False):
         count = 0
         for i, session in enumerate(data_list):
             if i in mouse_inds:
-                entry_times, exit_times, reward_times, trial_numbers = get_trial_events(session)
-                last_reward_times = [max([entry_times[i]] + list(trial_rewards)) for i, trial_rewards in enumerate(reward_times)]
+                entry_times, exit_times, reward_times, trial_numbers = get_trial_events(session,
+                                                                                        include_unrewarded=False)
+                last_reward_times = [max([entry_times[i]] + list(trial_rewards)) for i, trial_rewards in
+                                     enumerate(reward_times)]  # if there were no rewards, entry time is used instead
                 block_labels = [float(session[session.trial == trial].phase.iloc[0]) for trial in trial_numbers]
                 day = [count] * len(block_labels)
                 mouse_name = [mouse] * len(block_labels)
@@ -32,66 +31,103 @@ def trial_leave_times(file_list, data_list, save=False, data_only=False):
                     np.array([entry_times, exit_times, last_reward_times, trial_numbers, block_labels, day]).T,
                     columns=session_columns)
                 session_df['mouse'] = mouse_name
-                session_df['leave time'] = session_df.exit_times - session_df.entry_times
-                session_df['leave time from last reward'] = session_df.exit_times - session_df.last_reward_times
+                session_df['leave_time_from_entry'] = session_df.exit_times - session_df.entry_times
+                session_df['leave_time_from_reward'] = session_df.exit_times - session_df.last_reward_times
                 mouse_df = pd.concat([mouse_df, session_df])
         full_data_frame = pd.concat([full_data_frame, mouse_df])
         if not data_only:
-            blocks = np.unique(mouse_df.block_labels)
-            num_days = mouse_df.day.max() + 1
-            fig_x = .5 * num_days
-            for i, key in enumerate(['leave time', 'leave time from last reward']):
-                fig, ax = plt.subplots(1, 1, figsize=[fig_x, 5])
-                ax.set_title(mouse)
-                legend = 'auto'
-                sns.lineplot(x="day", y=key,
-                             hue="block_labels", legend=legend,
-                             data=mouse_df, ax=ax, palette=set2[:2])
-                ax.legend(loc='lower right')
-                ax.set_xlabel('Recording Session Number')
-                ax.set_ylabel(f'Leave Time (sec)')
-                ax.set_ylim([0, 16])
+            leave_times_per_session_plot(mouse_df, 'leave_time_from_entry', mouse=mouse, save_plot=save)
+            leave_times_per_session_plot(mouse_df, 'leave_time_from_reward', mouse=mouse, save_plot=save)
+            mouse_df['last_reward_from_entry'] = mouse_df.last_reward_times - mouse_df.entry_times
+            compare_plot(mouse_df, 'last_reward_from_entry', 'leave_time_from_reward', mouse=mouse, save_plot=save)
 
-                if save:
-                    if i == 0:
-                        backend.save_fig(fig, f'{mouse}_trial_leave_times.png')
-                    elif i == 1:
-                        backend.save_fig(fig, f'{mouse}_reward_leave_times.png')
-                else:
-                    plt.show()
-    if data_only:
-        return full_data_frame
-
-    for i, key in enumerate(['leave time', 'leave time from last reward']):
-        fig, ax = plt.subplots(1, 1, figsize=[8, 6])
-        ax.set_title(key)
-        sns.boxplot(x="mouse", y=key,
-                    hue="block_labels",
-                    data=full_data_frame, ax=ax, palette=set2[:2])
-        sns.swarmplot(x="mouse", y=key,
-                      hue="block_labels", legend=False, dodge=True,
-                      data=full_data_frame, ax=ax, palette=set2_dark[:2], size=2)
-        ax.legend(loc='lower right')
-        ax.set_xlabel('Mouse')
-        ax.set_ylabel(f'Leave Time (sec)')
-        ax.set_ylim([0, 16])
-
-        if save:
-            if i == 0:
-                ax.legend(loc='lower right')
-                ax.set_title('Leave Time From Port Entry')
-                backend.save_fig(fig, f'average_trial_leave_times.png')
-            elif i == 1:
-                ax.legend(loc='upper right')
-                ax.set_title('Leave Time From Last Reward')
-                backend.save_fig(fig, f'average_reward_leave_times.png')
-        else:
-            plt.show()
+    if not data_only:
+        leave_times_plot(full_data_frame, 'leave_time_from_entry', title='Leave Time From Port Entry',
+                         legend_placement='lower right',
+                         save_plot=save)
+        leave_times_plot(full_data_frame, 'leave_time_from_reward', title='Leave Time From Last Reward',
+                         legend_placement='upper right', save_plot=save)
 
     return full_data_frame
+
+
+def compare_plot(mouse_df, key1, key2, mouse=None, title=None, save_plot=False):
+    color_sets = backend.get_color_sets()
+    fig, ax = plt.subplots(1, 1, figsize=[8, 6])
+    sns.scatterplot(mouse_df, x=key1, y=key2, hue='block_labels', legend='auto', ax=ax, palette=color_sets['set2'][:2])
+    blocks = mouse_df.block_labels.unique()
+    blocks.sort()
+    for i, block in enumerate(blocks):
+        block_df = mouse_df[mouse_df.block_labels == block]
+        regression = LinearRegression()
+        regression.fit(np.expand_dims(block_df[key1].values, axis=1), np.expand_dims(block_df[key2].values, axis=1))
+        x = np.linspace(0, block_df[key1].max())
+        y = regression.predict(np.expand_dims(x, axis=1))
+        ax.plot(x, y, '-', c=color_sets['set2_med_dark'][i])
+    ax.set_xlabel('Time of Final Reward (sec)')
+    ax.set_ylabel('Leave Time after Final Reward (sec)')
+    ax.set_xlim([0, 18])
+    ax.set_ylim([0, 10])
+    if title:
+        ax.set_title(title)
+    else:
+        ax.set_title(mouse)
+
+    if save_plot:
+        backend.save_fig(fig, f'{mouse}_compare_plot.png')
+    else:
+        plt.show()
+
+
+def leave_times_per_session_plot(mouse_df, key, mouse=None, save_plot=False):
+    color_sets = backend.get_color_sets()
+    num_days = mouse_df.day.max() + 1
+    fig_x = .5 * num_days
+    fig, ax = plt.subplots(1, 1, figsize=[fig_x, 5])
+    ax.set_title(mouse)
+    sns.lineplot(x="day", y=key,
+                 hue="block_labels", legend='auto',
+                 data=mouse_df, ax=ax, palette=color_sets['set2'][:2])
+    ax.legend(loc='lower right')
+    ax.set_xlabel('Recording Session Number')
+    ax.set_ylabel(f'Leave Time (sec)')
+    ax.set_ylim([0, 16])
+
+    if save_plot:
+        backend.save_fig(fig, f'{mouse}_{key}.png')
+    else:
+        plt.show()
+
+
+def leave_times_plot(leave_data, key, title=None, legend_placement=None, save_plot=False):
+    color_sets = backend.get_color_sets()
+    fig, ax = plt.subplots(1, 1, figsize=[8, 6])
+    ax.set_title(key)
+    sns.boxplot(x="mouse", y=key,
+                hue="block_labels",
+                data=leave_data, ax=ax, palette=color_sets['set2'][:2])
+    sns.swarmplot(x="mouse", y=key,
+                  hue="block_labels", legend=False, dodge=True,
+                  data=leave_data, ax=ax, palette=color_sets['set2_dark'][:2], size=2)
+    ax.legend(loc='lower right')
+    ax.set_xlabel('Mouse')
+    ax.set_ylabel(f'Leave Time (sec)')
+    ax.set_ylim([0, 16])
+    if title:
+        ax.set_title(title)
+    else:
+        ax.set_title(key)
+
+    if legend_placement:
+        ax.legend(loc=legend_placement)
+
+    if save_plot:
+        backend.save_fig(fig, f'{key}.png')
+    else:
+        plt.show()
 
 
 if __name__ == '__main__':
     files = backend.get_session_list()
     data = [backend.load_data(session)[1] for session in files]
-    leave_time_df = trial_leave_times(files, data, save=True)
+    leave_time_df = trial_leave_times(files, data, save=False)
