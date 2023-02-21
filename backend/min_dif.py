@@ -16,6 +16,7 @@ def min_dif(a, b, tolerance=0, return_index=False, rev=False):
     # noinspection PyBroadException
     mins = np.nanmin(outer, axis=0)
     if return_index:
+
         index = np.nanargmin(outer, axis=0)
         return index, mins
     return mins
