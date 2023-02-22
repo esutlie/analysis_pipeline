@@ -4,6 +4,18 @@ from behavior import get_trial_events
 import numpy as np
 
 
+def create_precision_df(session):
+    spikes, pi_events, cluster_info = backend.load_data(session)
+    if len(spikes) == 0:
+        return False
+    entries, exits, rewards, trial_numbers = get_trial_events(pi_events)
+    for entry_time, exit_time, reward_list, trial, in zip(*get_trial_events(pi_events)):
+        interval_starts = [entry_time] + reward_list
+        interval_ends = reward_list + [exit_time]
+        interval_trial = [trial] * len(interval_starts)
+    session_df = pd.DataFrame()
+
+
 def create_bins_df(session):
     spikes, pi_events, cluster_info = backend.load_data(session)
     if len(spikes) == 0:
@@ -47,4 +59,5 @@ def create_bins_df(session):
 
 if __name__ == '__main__':
     first_session = backend.get_session_list()[0]
-    create_bins_df(first_session)
+    # create_bins_df(first_session)
+    create_precision_df(first_session)
