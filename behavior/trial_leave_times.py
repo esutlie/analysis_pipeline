@@ -4,7 +4,7 @@ import backend
 from behavior.get_trial_events import get_trial_events
 import pandas as pd
 import seaborn as sns
-from sklearn.linear_model import LinearRegression
+# from sklearn.linear_model import LinearRegression
 
 
 def trial_leave_times(file_list, data_list, save=False, data_only=False):
@@ -39,7 +39,7 @@ def trial_leave_times(file_list, data_list, save=False, data_only=False):
             leave_times_per_session_plot(mouse_df, 'leave_time_from_entry', mouse=mouse, save_plot=save)
             leave_times_per_session_plot(mouse_df, 'leave_time_from_reward', mouse=mouse, save_plot=save)
             mouse_df['last_reward_from_entry'] = mouse_df.last_reward_times - mouse_df.entry_times
-            compare_plot(mouse_df, 'last_reward_from_entry', 'leave_time_from_reward', mouse=mouse, save_plot=save)
+            # compare_plot(mouse_df, 'last_reward_from_entry', 'leave_time_from_reward', mouse=mouse, save_plot=save)
 
     if not data_only:
         leave_times_plot(full_data_frame, 'leave_time_from_entry', title='Leave Time From Port Entry',
@@ -51,32 +51,32 @@ def trial_leave_times(file_list, data_list, save=False, data_only=False):
     return full_data_frame
 
 
-def compare_plot(mouse_df, key1, key2, mouse=None, title=None, save_plot=False):
-    color_sets = backend.get_color_sets()
-    fig, ax = plt.subplots(1, 1, figsize=[8, 6])
-    sns.scatterplot(mouse_df, x=key1, y=key2, hue='block_labels', legend='auto', ax=ax, palette=color_sets['set2'][:2])
-    blocks = mouse_df.block_labels.unique()
-    blocks.sort()
-    for i, block in enumerate(blocks):
-        block_df = mouse_df[mouse_df.block_labels == block]
-        regression = LinearRegression()
-        regression.fit(np.expand_dims(block_df[key1].values, axis=1), np.expand_dims(block_df[key2].values, axis=1))
-        x = np.linspace(0, block_df[key1].max())
-        y = regression.predict(np.expand_dims(x, axis=1))
-        ax.plot(x, y, '-', c=color_sets['set2_med_dark'][i])
-    ax.set_xlabel('Time of Final Reward (sec)')
-    ax.set_ylabel('Leave Time after Final Reward (sec)')
-    ax.set_xlim([0, 18])
-    ax.set_ylim([0, 10])
-    if title:
-        ax.set_title(title)
-    else:
-        ax.set_title(mouse)
-
-    if save_plot:
-        backend.save_fig(fig, f'{mouse}_compare_plot.png')
-    else:
-        plt.show()
+# def compare_plot(mouse_df, key1, key2, mouse=None, title=None, save_plot=False):
+#     color_sets = backend.get_color_sets()
+#     fig, ax = plt.subplots(1, 1, figsize=[8, 6])
+#     sns.scatterplot(mouse_df, x=key1, y=key2, hue='block_labels', legend='auto', ax=ax, palette=color_sets['set2'][:2])
+#     blocks = mouse_df.block_labels.unique()
+#     blocks.sort()
+#     for i, block in enumerate(blocks):
+#         block_df = mouse_df[mouse_df.block_labels == block]
+#         regression = LinearRegression()
+#         regression.fit(np.expand_dims(block_df[key1].values, axis=1), np.expand_dims(block_df[key2].values, axis=1))
+#         x = np.linspace(0, block_df[key1].max())
+#         y = regression.predict(np.expand_dims(x, axis=1))
+#         ax.plot(x, y, '-', c=color_sets['set2_med_dark'][i])
+#     ax.set_xlabel('Time of Final Reward (sec)')
+#     ax.set_ylabel('Leave Time after Final Reward (sec)')
+#     ax.set_xlim([0, 18])
+#     ax.set_ylim([0, 10])
+#     if title:
+#         ax.set_title(title)
+#     else:
+#         ax.set_title(mouse)
+#
+#     if save_plot:
+#         backend.save_fig(fig, f'{mouse}_compare_plot.png')
+#     else:
+#         plt.show()
 
 
 def leave_times_per_session_plot(mouse_df, key, mouse=None, save_plot=False):

@@ -1,6 +1,6 @@
 import backend
 import numpy as np
-from create_bins_df import create_bins_df
+from create_bins_df import create_bins_df, create_precision_df
 from sklearn.model_selection import LeaveOneOut
 from sklearn.model_selection import cross_val_score
 from sklearn.linear_model import LinearRegression
@@ -13,7 +13,6 @@ import seaborn as sns
 
 def leave_time_regression():
     files = backend.get_session_list()
-    to_predict = ['time_from_entry', 'time_from_reward', 'time_before_exit', 'time_in_session']
     for session in files:
         if session != 'ES029_2022-09-14_bot72_0_g0':
             continue
@@ -101,6 +100,12 @@ def pca_on_average(session_df):
 
 
 def pca_on_average_pre_whitened(x_whitened, session_df):
+    """
+    This function serves to run pca on the average spike rates between intervals
+    :param x_whitened: feature matrix. Needs to already have been whitened
+    :param session_df: Complete data matrix to to get bins from
+    :return: None
+    """
     time_bins = range(round(session_df.time_from_reward.max() * 10))
     x_whitened_mean = np.vstack([np.mean(np.vstack(x_whitened[(session_df.time_from_reward > t / 10) & (
             session_df.time_from_reward < t / 10 + .1)]), axis=0) for t in time_bins])
