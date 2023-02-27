@@ -42,42 +42,49 @@ def trial_leave_times(file_list, data_list, save=False, data_only=False):
                 session_df['reward_count'] = reward_count
                 session_df['reward_interval'] = reward_interval
                 mouse_df = pd.concat([mouse_df, session_df])
+        mouse_df['last_reward_from_entry'] = mouse_df.last_reward_times - mouse_df.entry_times
+        mouse_df['reward_rate'] = mouse_df.reward_count / mouse_df.last_reward_from_entry
+        mouse_df['reward_rate'] = mouse_df['reward_rate'].fillna(0)
+        mouse_df['adjusted_reward_rate'] = mouse_df.reward_count / backend.decay_function_cumulative(
+            mouse_df.last_reward_from_entry)
+        mouse_df['adjusted_reward_rate'] = mouse_df['adjusted_reward_rate'].fillna(0)
         full_data_frame = pd.concat([full_data_frame, mouse_df])
         if not data_only:
-            # leave_times_per_session_plot(mouse_df, 'from_entry', mouse=mouse, save_plot=save)
-            # leave_times_per_session_plot(mouse_df, 'from_reward', mouse=mouse, save_plot=save)
-            mouse_df['last_reward_from_entry'] = mouse_df.last_reward_times - mouse_df.entry_times
-            mouse_df['reward_rate'] = mouse_df.reward_count / mouse_df.last_reward_from_entry
-            mouse_df['reward_rate'] = mouse_df['reward_rate'].fillna(0)
-            mouse_df['adjusted_reward_rate'] = mouse_df.reward_count / backend.decay_function_cumulative(
-                mouse_df.last_reward_from_entry)
-            mouse_df['adjusted_reward_rate'] = mouse_df['adjusted_reward_rate'].fillna(0)
+            leave_times_per_session_plot(mouse_df, 'from_entry', mouse=mouse, save_plot=save)
+            leave_times_per_session_plot(mouse_df, 'from_reward', mouse=mouse, save_plot=save)
 
-            # compare_plot(mouse_df, 'last_reward_from_entry', 'from_reward', mouse=mouse, save_plot=save,
-            #              x_lim=[0, 18], y_lim=[0, 10],
-            #              x_label='Time of Final Reward (sec)', y_label='Leave Time after Final Reward (sec)')
-            # compare_plot(mouse_df, 'last_reward_times', 'from_reward', mouse=mouse, save_plot=save,
-            #              x_lim=[0, mouse_df.exit_times.max()], y_lim=[0, 10],
-            #              x_label='Time in Session (sec)', y_label='Leave Time after Final Reward (sec)')
+            compare_plot(mouse_df, 'last_reward_from_entry', 'from_reward', mouse=mouse, save_plot=save,
+                         x_lim=[0, 18], y_lim=[0, 10],
+                         x_label='Time of Final Reward (sec)', y_label='Leave Time after Final Reward (sec)')
+            compare_plot(mouse_df, 'last_reward_times', 'from_reward', mouse=mouse, save_plot=save,
+                         x_lim=[0, mouse_df.exit_times.max()], y_lim=[0, 10],
+                         x_label='Time in Session (sec)', y_label='Leave Time after Final Reward (sec)')
             compare_plot(mouse_df, 'adjusted_reward_rate', 'from_reward', mouse=mouse, save_plot=save,
                          x_lim=[0, 8], y_lim=[0, 10],
                          x_label='Rate of Reward in Trial (reward/sec)', y_label='Leave Time after Final Reward (sec)')
-            # compare_plot(mouse_df, 'reward_interval', 'from_reward', mouse=mouse, save_plot=save,
-            #              x_lim=[0, mouse_df.reward_interval.max() + 1], y_lim=[0, 10],
-            #              x_label='Previous Reward-Reward Interval (sec)', y_label='Leave Time after Final Reward (sec)')
-            # compare_plot(mouse_df, 'last_reward_from_entry', 'adjusted_reward_rate', key3='from_reward', mouse=mouse,
-            #              save_plot=save,
-            #              x_lim=[0, mouse_df.last_reward_from_entry.max() + 1],
-            #              y_lim=[0, mouse_df.adjusted_reward_rate.max() + 1], z_lim=[0, 10],
-            #              x_label='Time of Final Reward (sec)', y_label='Adjusted Reward Rate (reward/sec)',
-            #              z_label='Leave Time after Final Reward (sec)')
+            compare_plot(mouse_df, 'reward_interval', 'from_reward', mouse=mouse, save_plot=save,
+                         x_lim=[0, mouse_df.reward_interval.max() + 1], y_lim=[0, 10],
+                         x_label='Previous Reward-Reward Interval (sec)', y_label='Leave Time after Final Reward (sec)')
+            compare_plot(mouse_df, 'last_reward_from_entry', 'adjusted_reward_rate', key3='from_reward', mouse=mouse,
+                         save_plot=save,
+                         x_lim=[0, mouse_df.last_reward_from_entry.max() + 1],
+                         y_lim=[0, mouse_df.adjusted_reward_rate.max() + 1], z_lim=[0, 10],
+                         x_label='Time of Final Reward (sec)', y_label='Adjusted Reward Rate (reward/sec)',
+                         z_label='Leave Time after Final Reward (sec)')
+    compare_plot(full_data_frame, 'last_reward_from_entry', 'from_reward', title='Effect of Time in Trial',
+                 save_plot=save,
+                 x_lim=[0, 18], y_lim=[0, 10],
+                 x_label='Time of Final Reward (sec)', y_label='Leave Time after Final Reward (sec)')
+    compare_plot(full_data_frame, 'adjusted_reward_rate', 'from_reward', title='Effect of Recent Reward Rate',
+                 save_plot=save,
+                 x_lim=[0, 8], y_lim=[0, 10],
+                 x_label='Rate of Reward in Trial (reward/sec)', y_label='Leave Time after Final Reward (sec)')
 
-    # if not data_only:
-    #     leave_times_plot(full_data_frame, 'from_entry', title='Leave Time From Port Entry',
-    #                      legend_placement='lower right',
-    #                      save_plot=save)
-    #     leave_times_plot(full_data_frame, 'from_reward', title='Leave Time From Last Reward',
-    #                      legend_placement='upper right', save_plot=save)
+    leave_times_plot(full_data_frame, 'from_entry', title='Leave Time From Port Entry',
+                     legend_placement='lower right',
+                     save_plot=save)
+    leave_times_plot(full_data_frame, 'from_reward', title='Leave Time From Last Reward',
+                     legend_placement='upper right', save_plot=save)
 
     return full_data_frame
 
@@ -85,6 +92,8 @@ def trial_leave_times(file_list, data_list, save=False, data_only=False):
 def compare_plot(mouse_df, key1, key2, key3=None, mouse=None, title=None, save_plot=False,
                  x_lim=None, y_lim=None, z_lim=None,
                  x_label=None, y_label=None, z_label=None):
+    if title is None:
+        title = mouse
     if x_label is None:
         x_label = key1
     if y_label is None:
@@ -95,7 +104,7 @@ def compare_plot(mouse_df, key1, key2, key3=None, mouse=None, title=None, save_p
     if key3 is None:
         fig, ax = plt.subplots(1, 1, figsize=[8, 6])
         sns.scatterplot(data=mouse_df, x=key1, y=key2, hue='block_labels', legend='auto', ax=ax,
-                        palette=color_sets['set2'][:2])
+                        palette=color_sets['set2'][:2], s=5)
         blocks = mouse_df.block_labels.unique()
         blocks.sort()
         for i, block in enumerate(blocks):
@@ -125,13 +134,10 @@ def compare_plot(mouse_df, key1, key2, key3=None, mouse=None, title=None, save_p
         ax.set_ylim(y_lim)
     if z_lim:
         ax.set_zlim(z_lim)
-    if title:
-        ax.set_title(title)
-    else:
-        ax.set_title(mouse)
+    ax.set_title(title)
 
     if save_plot:
-        backend.save_fig(fig, f'{mouse}_compare_plot.png')
+        backend.save_fig(fig, f'{title}_compare_plot.png')
     else:
         plt.show()
 
@@ -187,4 +193,4 @@ def leave_times_plot(leave_data, key, title=None, legend_placement=None, save_pl
 if __name__ == '__main__':
     files = backend.get_session_list()
     data = [backend.load_data(session)[1] for session in files]
-    leave_time_df = trial_leave_times(files, data, save=False)
+    leave_time_df = trial_leave_times(files, data, save=True, data_only=True)

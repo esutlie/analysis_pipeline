@@ -13,8 +13,8 @@ def trial_raster():
         'Spikes (.4r/s block)': set2[1],
         'Exponential Port Entry': 'r',
         'Exponential Port Exit': 'k',
-        'Background Port Entry': 'g',
-        'Background Port Exit': 'b',
+        # 'Background Port Entry': 'g',
+        # 'Background Port Exit': 'b',
     }
 
 
