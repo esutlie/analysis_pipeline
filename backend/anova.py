@@ -1,7 +1,7 @@
 import pingouin as pg
 
 
-def anova(data, variable, within, subject):
+def rm_anova(data, variable, within, subject):
     """
     This is not quite right, need to think about when to use the anova specifically, this time I just need a t-test
     cause I want each mouse individually
@@ -16,3 +16,7 @@ def anova(data, variable, within, subject):
     print(f'\npost hocs {variable}:')
     print(post_hocs[['A', 'B', 'p-corr']])
     print(post_hocs[['A', 'B', 'p-unc']])
+
+
+def ancova(data, variable, covar, between):
+    pg.ancova(data=data, dv=variable, covar=covar, between=between)
