@@ -24,7 +24,7 @@ def create_precision_df(session, kernel_size=300):
     trial_group = get_trial_group(pi_events)
     interval_columns = ['interval_starts', 'interval_ends', 'interval_trial', 'interval_phase']
     intervals_df = pd.DataFrame(columns=interval_columns)
-    for entry_time, exit_time, reward_list, trial, in zip(*get_trial_events(pi_events)):
+    for entry_time, exit_time, reward_list, trial, actives in zip(*get_trial_events(pi_events)):
         interval_starts = [entry_time] + reward_list.tolist()
         interval_ends = reward_list.tolist() + [exit_time]
         interval_trial = [trial] * len(interval_starts)

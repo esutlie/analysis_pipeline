@@ -15,14 +15,27 @@ def trial_leave_times(file_list, data_list, save=False, data_only=False):
     mouse_list = [file[:5] for file in file_list]
     mouse_names = np.unique(mouse_list)
     full_data_frame = pd.DataFrame(columns=full_columns)
+    rates_columns = ['mouse', 'block_labels', 'rate']
+    rates_df = pd.DataFrame(columns=rates_columns)
     for mouse in mouse_names:
         mouse_inds = np.where(np.array(mouse_list) == mouse)[0]
         mouse_df = pd.DataFrame(columns=full_columns)
         count = 0
+        total_rewards_b1 = 0
+        total_rewards_b2 = 0
+        total_rewards = 0
+        total_active_time_b1 = 0
+        total_active_time_b2 = 0
+        total_active_time = 0
         for i, session in enumerate(data_list):
             if i in mouse_inds:
-                entry_times, exit_times, reward_times, trial_numbers = get_trial_events(session,
-                                                                                        include_unrewarded=False)
+                entry_times, exit_times, reward_times, trial_numbers, active_time = get_trial_events(session,
+                                                                                                     include_unrewarded=False)
+                total_rewards_b1 += len(
+                    session[(session.key == 'reward') & (session.value == 1) & (session.phase == '0.4')])
+                total_rewards_b2 += len(
+                    session[(session.key == 'reward') & (session.value == 1) & (session.phase == '0.8')])
+                total_rewards += len(session[(session.key == 'reward') & (session.value == 1)])
                 last_reward_times = [max([entry_times[i]] + list(trial_rewards)) for i, trial_rewards in
                                      enumerate(reward_times)]
                 reward_count = [len(trial_rewards) for trial_rewards in reward_times]
@@ -30,6 +43,9 @@ def trial_leave_times(file_list, data_list, save=False, data_only=False):
                 reward_interval = [trial_rewards[-1] - trial_rewards[-2] if len(trial_rewards) >= 2 else 0 for
                                    trial_rewards in reward_times]
                 block_labels = [float(session[session.trial == trial].phase.iloc[0]) for trial in trial_numbers]
+                total_active_time_b1 += sum([active_time[j] for j in np.where(np.array(block_labels) == 0.4)[0]])
+                total_active_time_b2 += sum([active_time[j] for j in np.where(np.array(block_labels) == 0.8)[0]])
+                total_active_time += sum(active_time)
                 day = [count] * len(block_labels)
                 mouse_name = [mouse] * len(block_labels)
                 count += 1
@@ -42,6 +58,17 @@ def trial_leave_times(file_list, data_list, save=False, data_only=False):
                 session_df['reward_count'] = reward_count
                 session_df['reward_interval'] = reward_interval
                 mouse_df = pd.concat([mouse_df, session_df])
+
+                rates = [total_rewards_b1 / total_active_time_b1, total_rewards_b2 / total_active_time_b2]
+                rates_session_df = pd.DataFrame(np.array(rates), columns=['rate'])
+                rates_session_df['mouse'] = np.array([mouse, mouse])
+                rates_session_df['block_labels'] = np.array(['0.4', '0.8'])
+                rates_df = pd.concat([rates_df, rates_session_df])
+        # overall_reward_rate = sum(mouse_df.reward_count) / sum(mouse_df.from_entry)
+        # print(f'{mouse} reward rate: {overall_reward_rate} rewards/second in exp port')
+        session_reward_rate = total_rewards / total_active_time
+        print(f'{mouse} reward rate: {session_reward_rate * 60} rewards/minute engaged in session')
+
         mouse_df['last_reward_from_entry'] = mouse_df.last_reward_times - mouse_df.entry_times
         mouse_df['reward_rate'] = mouse_df.reward_count / mouse_df.last_reward_from_entry
         mouse_df['reward_rate'] = mouse_df['reward_rate'].fillna(0)
@@ -81,10 +108,11 @@ def trial_leave_times(file_list, data_list, save=False, data_only=False):
                  x_label='Rate of Reward in Trial (reward/sec)', y_label='Leave Time after Final Reward (sec)')
 
     leave_times_plot(full_data_frame, 'from_entry', title='Leave Time From Port Entry',
-                     legend_placement='lower right',
-                     save_plot=save)
+                     legend_placement='lower right', save_plot=save, y_lim=[0, 16])
     leave_times_plot(full_data_frame, 'from_reward', title='Leave Time From Last Reward',
-                     legend_placement='upper right', save_plot=save)
+                     legend_placement='upper right', save_plot=save, y_lim=[0, 16])
+    # leave_times_plot(rates_df, 'rate', title='Average Reward Rate',
+    #                  legend_placement='upper right', save_plot=save, y_label='Rewards per Second', hue='None')
 
     return full_data_frame
 
@@ -162,20 +190,24 @@ def leave_times_per_session_plot(mouse_df, key, mouse=None, save_plot=False):
         plt.show()
 
 
-def leave_times_plot(leave_data, key, title=None, legend_placement=None, save_plot=False):
+def leave_times_plot(leave_data, key, title=None, legend_placement=None, save_plot=False, y_label=None, y_lim=None,
+                     hue='block_labels'):
+    if y_label is None:
+        y_label = 'Leave Time (sec)'
     color_sets = backend.get_color_sets()
     fig, ax = plt.subplots(1, 1, figsize=[8, 6])
     ax.set_title(key)
     sns.boxplot(x="mouse", y=key,
-                hue="block_labels",
+                hue=hue,
                 data=leave_data, ax=ax, palette=color_sets['set2'][:2])
     sns.swarmplot(x="mouse", y=key,
-                  hue="block_labels", dodge=True,
+                  hue=hue, dodge=True,
                   data=leave_data, ax=ax, palette=color_sets['set2_dark'][:2], size=2)
     ax.legend(loc='lower right')
     ax.set_xlabel('Mouse')
-    ax.set_ylabel(f'Leave Time (sec)')
-    ax.set_ylim([0, 16])
+    ax.set_ylabel(y_label)
+    if y_lim:
+        ax.set_ylim([0, 16])
     if title:
         ax.set_title(title)
     else:
@@ -193,4 +225,4 @@ def leave_times_plot(leave_data, key, title=None, legend_placement=None, save_pl
 if __name__ == '__main__':
     files = backend.get_session_list()
     data = [backend.load_data(session)[1] for session in files]
-    leave_time_df = trial_leave_times(files, data, save=True, data_only=True)
+    leave_time_df = trial_leave_times(files, data, save=False, data_only=True)

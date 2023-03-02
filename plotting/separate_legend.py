@@ -4,13 +4,13 @@ import seaborn as sns
 import backend
 
 set2 = sns.color_palette(palette='Set2')
-
+color_sets = backend.get_color_sets()
 
 def trial_raster():
     return {
         'Reward': 'purple',
-        'Spikes (.8r/s block)': set2[0],
-        'Spikes (.4r/s block)': set2[1],
+        'Spikes (.4r/s block)': set2[0],
+        'Spikes (.8r/s block)': set2[1],
         'Exponential Port Entry': 'r',
         'Exponential Port Exit': 'k',
         # 'Background Port Entry': 'g',
@@ -20,16 +20,32 @@ def trial_raster():
 
 def reward_raster():
     return {
-        'Spikes (.8r/s block)': set2[0],
-        'Spikes (.4r/s block)': set2[1],
+        'Spikes (.4r/s block)': set2[0],
+        'Spikes (.8r/s block)': set2[1],
         'Rewarded Lick': 'red',
         'Exponential Port Exit': 'k',
     }
 
 
-def separate_legend(entries, file_name=None):
+def blocks():
+    return {
+        '0.4 r/s': set2[0],
+        '0.8 r/s': set2[1],
+    }
+
+def pca_cluster_activity():
+    return {
+        'Cluster 1 - Low': set2[0],
+        'Cluster 1 - High': color_sets['set2_dark'][0],
+        'Cluster 2 - Low': set2[1],
+        'Cluster 2 - High': color_sets['set2_dark'][1],
+        'Cluster 3 - Low': set2[2],
+        'Cluster 3 - High': color_sets['set2_dark'][2],
+    }
+
+def separate_legend(entries, file_name=None, marker='|'):
     properties = {
-        'marker': '|',
+        'marker': marker,
         'linestyle': 'None',
         'markersize': 15,
         'markeredgewidth': 2.5,
@@ -55,3 +71,6 @@ if __name__ == '__main__':
     save_legend = True
     separate_legend(trial_raster(), file_name='legend_trial_raster.png')
     separate_legend(reward_raster(), file_name='legend_reward_raster.png')
+    separate_legend(blocks(), file_name='block_dots.png', marker='.')
+    separate_legend(blocks(), file_name='block_lines.png', marker='_')
+    separate_legend(pca_cluster_activity(), file_name='pca_cluster_activity.png', marker='_')
