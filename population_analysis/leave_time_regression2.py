@@ -1,7 +1,7 @@
 import backend
 import numpy as np
 from create_bins_df import create_precision_df
-from get_pca_space import get_pca_space, get_set_averages, get_sets
+from get_pca_space import get_pca_space, get_set_averages, get_sets, single_pca_traj
 import matplotlib.pyplot as plt
 import math
 import matplotlib
@@ -15,6 +15,9 @@ def leave_time_regression():
         if session != 'ES029_2022-09-14_bot72_0_g0':
             continue
         normalized_spikes, interval_ids, intervals_df = create_precision_df(session)
+
+        pca_space = single_pca_traj(normalized_spikes, interval_ids, intervals_df, plot=True)
+
         pca_space = get_pca_space(normalized_spikes, interval_ids, intervals_df)
         pca_spikes = pca_space.transform(normalized_spikes.T).T
         blocks = np.unique(intervals_df.block)

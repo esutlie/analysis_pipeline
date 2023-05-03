@@ -20,10 +20,14 @@ def crop_slices(show_pics=False, save_pics=False):
         count = 0
         slice_pics = []
         name = names[i]
+        if name[-4:] == 'jpeg':
+            continue
         arr = np.array(picture)
         row_mean = np.mean(arr[:, :, 2], axis=1)
         row_mean_filter = savgol_filter(row_mean, 1001, 3)
-
+        if save_pics:
+            im = Image.fromarray(arr)
+            im.save(os.path.join('pics', f'{name[:-4]}.jpeg'))
         # plt.plot(row_mean)
         # plt.plot(row_mean_filter)
         # plt.title(name)
@@ -78,4 +82,4 @@ def crop_slices(show_pics=False, save_pics=False):
 
 
 if __name__ == '__main__':
-    crop_slices(show_pics=True, save_pics=True)
+    crop_slices(show_pics=False, save_pics=True)

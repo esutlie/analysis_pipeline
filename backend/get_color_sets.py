@@ -7,5 +7,6 @@ def get_color_sets():
         'set2_dark': [[c * .5 for c in sublist] for sublist in sns.color_palette('Set2')],
         'set2_med_dark': [[c * .8 for c in sublist] for sublist in sns.color_palette('Set2')],
         'colorblind': sns.color_palette('colorblind'),
+        'grays': sns.color_palette('Greys'),
     }
     return color_sets

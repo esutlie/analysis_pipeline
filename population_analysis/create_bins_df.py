@@ -4,6 +4,8 @@ from behavior import get_trial_events
 import numpy as np
 import math
 from scipy.ndimage import convolve1d
+import os
+import matplotlib.pyplot as plt
 
 
 def get_trial_group(events):
@@ -14,8 +16,18 @@ def get_trial_group(events):
     return pd.Series(block_idx, index=np.unique(pi_events_shortened.trial))
 
 
-def create_precision_df(session, kernel_size=300):
-    kernel = np.ones([kernel_size])
+def create_precision_df(session, kernel_size=300, regenerate=False):
+    local_path = os.path.join(backend.get_data_path(), session)
+    normalized_spikes_path = os.path.join(local_path, 'normalized_spikes.npy')
+    interval_ids_path = os.path.join(local_path, 'interval_ids.npy')
+    intervals_df_path = os.path.join(local_path, 'intervals_df.pkl')
+    if np.all([os.path.exists(path) for path in
+               [normalized_spikes_path, interval_ids_path, intervals_df_path]]) and not regenerate:
+        normalized_spikes = np.load(normalized_spikes_path)
+        interval_ids = np.load(interval_ids_path)
+        intervals_df = pd.read_pickle(intervals_df_path)
+        return normalized_spikes, interval_ids, intervals_df
+    kernel = get_gaussian_kernel(l=kernel_size, sigma=kernel_size / 5)
     spikes, pi_events, cluster_info = backend.load_data(session)
     if len(spikes) == 0:
         return False
@@ -49,8 +61,12 @@ def create_precision_df(session, kernel_size=300):
         interval_ids.append(interval_idx * np.ones([len(spike_rates[0])]))
     filtered_interval_arrays = np.concatenate(filtered_interval_arrays, axis=1)
     interval_ids = np.concatenate(interval_ids, axis=0)
-    centered_spikes = np.subtract(filtered_interval_arrays, np.expand_dims(np.mean(filtered_interval_arrays, axis=1), axis=1))
+    centered_spikes = np.subtract(filtered_interval_arrays,
+                                  np.expand_dims(np.mean(filtered_interval_arrays, axis=1), axis=1))
     normalized_spikes = np.divide(centered_spikes, np.expand_dims(np.std(centered_spikes, axis=1), axis=1))
+    np.save(normalized_spikes_path, normalized_spikes)
+    np.save(interval_ids_path, interval_ids)
+    intervals_df.to_pickle(intervals_df_path)
     return normalized_spikes, interval_ids, intervals_df
 
 
@@ -94,6 +110,24 @@ def create_bins_df(session):
     session_df['block'] = trial_blocks.loc[session_df.trial].values
     return session_df
 
+
+def get_gaussian_kernel(l=5, sigma=1.):
+    """\
+    creates gaussian kernel with side length `l` and a sigma of `sig`
+    """
+    ax = np.linspace(-(l - 1) / 2., (l - 1) / 2., l)
+    gauss = np.exp(-0.5 * np.square(ax) / np.square(sigma))
+    # plt.plot(gauss)
+    # plt.show()
+    return gauss / np.sum(gauss)
+
+# def test_kernel():
+#     i = 12
+#     plt.plot(spike_rates[i] / 20)
+#     plt.plot(convolve1d(spike_rates, get_gaussian_kernel(l=50, sigma=50 / 5))[i])
+#     plt.plot(convolve1d(spike_rates, get_gaussian_kernel(l=100, sigma=100 / 5))[i])
+#     plt.plot(convolve1d(spike_rates, get_gaussian_kernel(l=300, sigma=300 / 5))[i])
+#     plt.show()
 
 if __name__ == '__main__':
     first_session = backend.get_session_list()[0]
