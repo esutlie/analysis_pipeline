@@ -14,7 +14,7 @@ def leave_time_regression():
     for session in files:
         if session != 'ES029_2022-09-14_bot72_0_g0':
             continue
-        normalized_spikes, interval_ids, intervals_df = create_precision_df(session)
+        [normalized_spikes, _, _], interval_ids, intervals_df = create_precision_df(session)
 
         pca_space = single_pca_traj(normalized_spikes, interval_ids, intervals_df, plot=True)
 
