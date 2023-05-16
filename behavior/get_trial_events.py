@@ -19,6 +19,8 @@ def get_trial_events(data, entry_tolerance=.5, exit_tolerance=2, include_unrewar
         trial_block = data[(data.trial == trial_number)].phase.iloc[0]
         port2_time = 10 if trial_block == '0.4' else 5
 
+        if not len(exit_times):
+            continue
         entry_times = entry_times[(entry_times - available_time) > 0]
         entry_times = entry_times[backend.min_dif(entry_times, exit_times) > entry_tolerance]
         if not len(entry_times) or not len(lick_times) or not (len(reward_times) or include_unrewarded):

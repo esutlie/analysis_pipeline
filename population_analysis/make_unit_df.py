@@ -5,14 +5,18 @@ from get_pca_space import get_pca_space, get_set_averages
 import matplotlib.pyplot as plt
 import math
 import random
-
+import json
+import os
 
 def make_unit_df():
     color_sets = backend.get_color_sets()
     files = backend.get_session_list()
     x = np.arange(10000)
     for session in files:
-        [_, convolved_spikes, _], interval_ids, intervals_df = create_precision_df(session, regenerate=True)
+        info = backend.get_info(session)
+        if info['task'] != 'cued_no_forgo_forced':
+            continue
+        [_, convolved_spikes, _], interval_ids, intervals_df = create_precision_df(session, regenerate=False)
         # max(sum(interval_ids==i) for i in np.unique(interval_ids))  # Find the max interval length
         blocks = intervals_df.block.unique()
         blocks.sort()

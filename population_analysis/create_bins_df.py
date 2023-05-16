@@ -20,21 +20,27 @@ def create_precision_df(session, kernel_size=1000, regenerate=False):
     local_path = os.path.join(backend.get_data_path(), session)
     normalized_spikes_path = os.path.join(local_path, 'normalized_spikes.npy')
     convolved_spikes_path = os.path.join(local_path, 'convolved_spikes.npy')
+    boxcar_spikes_path = os.path.join(local_path, 'boxcar_spikes.npy')
     original_spikes_path = os.path.join(local_path, 'original_spikes.npy')
     interval_ids_path = os.path.join(local_path, 'interval_ids.npy')
     intervals_df_path = os.path.join(local_path, 'intervals_df.pkl')
-    if np.all([os.path.exists(path) for path in
-               [normalized_spikes_path, convolved_spikes_path, original_spikes_path, interval_ids_path,
-                intervals_df_path]]) and not regenerate:
+    paths = [normalized_spikes_path, convolved_spikes_path, boxcar_spikes_path, original_spikes_path, interval_ids_path,
+             intervals_df_path]
+    if np.all([os.path.exists(path) for path in paths]) and not regenerate:
         normalized_spikes = np.load(normalized_spikes_path)
+        convolved_spikes = np.load(convolved_spikes_path)
+        boxcar_spikes = np.load(boxcar_spikes_path)
         original_spikes = np.load(original_spikes_path)
         interval_ids = np.load(interval_ids_path)
         intervals_df = pd.read_pickle(intervals_df_path)
-        return normalized_spikes, original_spikes, interval_ids, intervals_df
+        return [normalized_spikes, convolved_spikes, boxcar_spikes, original_spikes], interval_ids, intervals_df
     kernel = get_gaussian_kernel(l=kernel_size, sigma=kernel_size / 5)
+    boxcar_kernel = get_boxcar_kernel(w=100)
+    # plt.plot(kernel)
+    # plt.show()
     spikes, pi_events, cluster_info = backend.load_data(session)
     if len(spikes) == 0:
-        return False
+        return [None, None, None, None], None, None
     clusters = np.unique(spikes.cluster)
     trial_blocks = pi_events.groupby('trial').phase.max()
     trial_group = get_trial_group(pi_events)
@@ -51,6 +57,7 @@ def create_precision_df(session, kernel_size=1000, regenerate=False):
     intervals_df['block'] = trial_blocks.loc[intervals_df.interval_trial.values].values
     intervals_df['group'] = trial_group.loc[intervals_df.interval_trial.values].values
     filtered_interval_arrays = []
+    boxcar_interval_arrays = []
     original_interval_arrays = []
     interval_ids = []
     interval_rates = []
@@ -67,9 +74,11 @@ def create_precision_df(session, kernel_size=1000, regenerate=False):
                 spike_rates[i, index] = counts.loc[index]
         interval_rates.append(np.sum(spike_rates, axis=1) / (end - start))
         filtered_interval_arrays.append(convolve1d(spike_rates, kernel))
+        boxcar_interval_arrays.append(convolve1d(spike_rates, boxcar_kernel))
         original_interval_arrays.append(spike_rates)
         interval_ids.append(interval_idx * np.ones([len(spike_rates[0])]))
     convolved_spikes = np.concatenate(filtered_interval_arrays, axis=1)
+    boxcar_spikes = np.concatenate(boxcar_interval_arrays, axis=1)
     original_spikes = np.concatenate(original_interval_arrays, axis=1)
     interval_ids = np.concatenate(interval_ids, axis=0)
     centered_spikes = np.subtract(convolved_spikes,
@@ -78,10 +87,11 @@ def create_precision_df(session, kernel_size=1000, regenerate=False):
     intervals_df['rate'] = interval_rates
     np.save(normalized_spikes_path, normalized_spikes)
     np.save(convolved_spikes_path, convolved_spikes)
+    np.save(boxcar_spikes_path, boxcar_spikes)
     np.save(original_spikes_path, original_spikes)
     np.save(interval_ids_path, interval_ids)
     intervals_df.to_pickle(intervals_df_path)
-    return [normalized_spikes, convolved_spikes, original_spikes], interval_ids, intervals_df
+    return [normalized_spikes, convolved_spikes, boxcar_spikes, original_spikes], interval_ids, intervals_df
 
 
 def create_bins_df(session):
@@ -134,6 +144,10 @@ def get_gaussian_kernel(l=5, sigma=1.):
     # plt.plot(gauss)
     # plt.show()
     return gauss / np.sum(gauss)
+
+
+def get_boxcar_kernel(w=10):
+    return np.ones(w)
 
 
 # def test_kernel():

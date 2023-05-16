@@ -12,3 +12,4 @@ from .t_test import t_test, pairwise_ttests
 from .get_color_sets import get_color_sets
 from .whiten import whiten
 from .k_nearest_line import NearestLines
+from.get_info import get_info

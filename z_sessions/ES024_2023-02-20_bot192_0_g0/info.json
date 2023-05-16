@@ -1,0 +1,1 @@
+{"mouse": "ES024", "date": "2023-02-20", "time": "12-00-24", "task": "cued_no_forgo_forced", "port1_info": {"distribution": "exp_decreasing", "cumulative": 8, "starting_probability": 1, "port_num": 1}, "port2_info": {"distribution": "background", "rates": [0.4, 0.8, 0.4, 0.8, 0.4, 0.8], "duration": 5, "port_num": 2}, "box": "elissapi0"}
