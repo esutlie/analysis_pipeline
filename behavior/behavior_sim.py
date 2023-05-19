@@ -39,4 +39,4 @@ def behavior_sim(save=False):
 
 
 if __name__ == '__main__':
-    behavior_sim(save=True)
+    behavior_sim(save=False)
