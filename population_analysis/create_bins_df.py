@@ -1,3 +1,5 @@
+"""This file is for processing the neural spike times into rates with different levels of smoothing and normalization"""
+
 import pandas as pd
 import backend
 from behavior import get_trial_events
