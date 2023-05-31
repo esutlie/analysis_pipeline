@@ -24,9 +24,11 @@ def get_binned_quantiles(session, verbose=False, regenerate=False):
     binned_counts_path = os.path.join(local_path, 'binned_counts.npy')
     binned_x_path = os.path.join(local_path, 'binned_x.npy')
     binned_quantiles_path = os.path.join(local_path, 'binned_quantiles.npy')
-    paths = [binned_x_path, binned_counts_path, binned_quantiles_path]
+    binned_intervals_path = os.path.join(local_path, 'binned_intervals.npy')
+    paths = [binned_x_path, binned_counts_path, binned_quantiles_path, binned_intervals_path]
     if np.all([os.path.exists(path) for path in paths]) and not regenerate:
-        return np.load(binned_counts_path), np.load(binned_x_path), np.load(binned_quantiles_path)
+        return np.load(binned_counts_path), np.load(binned_x_path), np.load(binned_quantiles_path), np.load(
+            binned_intervals_path)
 
     bin_size = .3
     num_quantiles = 5
@@ -40,6 +42,7 @@ def get_binned_quantiles(session, verbose=False, regenerate=False):
     binned_counts = np.zeros([num_units, num_time_bins, num_quantiles + 1])
     binned_x = []
     binned_quantiles = []
+    binned_intervals = []
     for unit in range(num_units):
         bin_counts = []
         for trial in np.unique(interval_ids):
@@ -48,6 +51,8 @@ def get_binned_quantiles(session, verbose=False, regenerate=False):
                 trial_spikes = original_spikes[unit, (interval_ids == trial)][:round(num_groups * bin_size * 1000)]
                 groups = np.sum(np.stack(np.array_split(trial_spikes, num_groups)), axis=1)
                 bin_counts.append(groups.astype(int))
+                if unit == 0:
+                    binned_intervals.append([trial]*num_groups)
         all_counts = np.hstack(bin_counts)
         non_zero_counts = all_counts[all_counts != 0]
         quants = [np.quantile(non_zero_counts, q) for q in np.linspace(0, 1 - 1 / num_quantiles, num_quantiles)]
@@ -57,6 +62,7 @@ def get_binned_quantiles(session, verbose=False, regenerate=False):
         if not len(binned_x):
             unit_x = [list(range(len(trial_count))) for trial_count in bin_counts]
             binned_x = backend.flatten_list(unit_x)
+            binned_intervals = backend.flatten_list(binned_intervals)
 
         for b in range(num_time_bins):
             assigned_quants = [sum(count[b] > np.array(quants)) for count in bin_counts if len(count) > b]
@@ -77,7 +83,8 @@ def get_binned_quantiles(session, verbose=False, regenerate=False):
     np.save(binned_counts_path, binned_counts)
     np.save(binned_x_path, np.array(binned_x))
     np.save(binned_quantiles_path, np.stack(binned_quantiles))
-    return binned_counts, binned_x, binned_quantiles
+    np.save(binned_intervals_path, np.array(binned_intervals))
+    return binned_counts, binned_x, binned_quantiles, binned_intervals
 
 
 def get_bayes(binned_quantiles):
@@ -215,7 +222,7 @@ def main():
     for session in files:
         if session != 'ES029_2022-09-14_bot72_0_g0':
             continue
-        binned_counts, binned_x, binned_quantiles = get_binned_quantiles(session)
+        binned_counts, binned_x, binned_quantiles, binned_intervals = get_binned_quantiles(session)
         bayes = get_bayes(binned_counts)
 
         # fit_by_random(bayes, binned_counts, binned_x, binned_quantiles)
