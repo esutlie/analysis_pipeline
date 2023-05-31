@@ -15,6 +15,8 @@ from sklearn.preprocessing import minmax_scale
 from scipy.ndimage import convolve1d
 import math
 from center_of_mass import get_mean
+from itertools import repeat
+import pandas as pd
 
 
 def get_binned_quantiles(session, verbose=False, regenerate=False):
@@ -85,7 +87,127 @@ def get_bayes(binned_quantiles):
     return bayes
 
 
-# def predict():
+def predict(bayes, quantiles, w):
+    return np.sum(bayes[np.arange(len(bayes)), :, quantiles] * w[:, None], axis=0) / sum(w)
+
+
+def center_of_mass(pred):
+    return np.sum(np.arange(pred.shape[1]) * pred, axis=1)
+
+
+def score_model(x, y, plot=False, log=True):
+    if log:
+        x = np.log(x.reshape(-1, 1) + 1)
+    else:
+        x = x.reshape(-1, 1)
+    model = LinearRegression()
+    model.fit(x, y)
+    score = model.score(x, y)
+    model_pred = model.predict(x)
+    if plot:
+        if log:
+            plt.scatter(np.exp(x) - 1, y)
+            plt.scatter(np.exp(x) - 1, model_pred)
+        else:
+            plt.scatter(x, y)
+            plt.scatter(x, model_pred)
+        plt.show()
+    return score
+
+
+def prediction_model(x, y, plot=False):
+    y = np.log(y + 1)
+    x = x.reshape(-1, 1)
+    model = LinearRegression()
+    model.fit(x, y)
+    score = model.score(x, y)
+    model_pred = model.predict(x)
+    if plot:
+        plt.scatter(x, np.exp(y) - 1)
+        plt.scatter(x, np.exp(model_pred) - 1)
+        plt.ylabel('time (seconds)')
+        plt.xlabel('bayesian prediction variable')
+        plt.show()
+    return np.exp(model_pred) - 1
+
+
+def score_by_local(x):
+    top = np.argsort(x)[-3:] if np.argmax(x) != 0 else np.argsort(x)[-2:]
+    return sum(top * x[top]) / sum(x[top])
+
+
+def fit_by_random(bayes, binned_counts, binned_x, binned_quantiles):
+    scores = []
+    weights = []
+    for i in range(50):
+        w = np.random.random([binned_counts.shape[0]])
+        pred = np.array(list(map(predict, repeat(bayes), binned_quantiles.T, repeat(w))))
+        com = center_of_mass(pred)
+        score = score_model(binned_x, com, plot=False, log=True)
+        scores.append(score)
+        weights.append(w)
+    score = np.max(scores)
+    print(f'starting score: {score}')
+    score_memory = score
+    w = weights[np.argmax(scores)]
+    for i in range(10000):
+        history = []
+        deltas = [.5, 1, 2]
+        for delta in deltas:
+            temp_weights = w.copy()
+            temp_weights[i % len(w)] *= delta
+            temp_weights /= np.max(temp_weights)
+            pred = np.array(list(map(predict, repeat(bayes), binned_quantiles.T, repeat(temp_weights))))
+            com = center_of_mass(pred)
+            score = score_model(binned_x, com, plot=False, log=True)
+            history.append(score)
+        w[i % len(w)] *= deltas[np.argmax(history)]
+        w /= np.max(w)
+        print(f'{i} score: {np.max(history)}     {deltas[np.argmax(history)]}')
+        if i % 100 == 0:
+            np.save(os.path.join(os.getcwd(), 'weights.npy'), w)
+            plt.plot(w)
+            plt.show()
+            print('score improved by: ' + abs(score - score_memory))
+            if abs(score - score_memory) < .001:
+                break
+            score_memory = score
+    return w
+
+
+def fit_by_exclude(bayes, binned_counts, binned_x, binned_quantiles):  # Not done
+    w = np.ones([binned_counts.shape[0]])
+    pred = np.array(list(map(predict, repeat(bayes), binned_quantiles.T, repeat(w))))
+    com = center_of_mass(pred)
+    score = score_model(binned_x, com, plot=True, log=True)
+    print(f'starting error: {score}')
+    scores = []
+    for i in range(len(w)):
+        weights = w.copy()
+        weights[i] = 0
+        pred = np.array(list(map(predict, repeat(bayes), binned_quantiles.T, repeat(w))))
+        com = center_of_mass(pred)
+        score = score_model(binned_x, com, plot=True, log=True)
+        scores.append(score)
+        print(score)
+
+
+def compare(session, binned_pred, binned_x):
+    local_path = os.path.join(backend.get_data_path(), session)
+    interval_ids_path = os.path.join(local_path, 'interval_ids.npy')
+    intervals_df_path = os.path.join(local_path, 'intervals_df.pkl')
+    interval_ids = np.load(interval_ids_path)
+    intervals_df = pd.read_pickle(intervals_df_path)
+
+    interval = 0
+    interval_x = []
+    for i, x in enumerate(binned_x):
+        if i != 0 and x == 0:
+            interval += 1
+        interval_x.append(interval)
+    interval_x = np.array(interval_x)
+    print()
+
 
 def main():
     color_sets = backend.get_color_sets()
@@ -95,11 +217,31 @@ def main():
             continue
         binned_counts, binned_x, binned_quantiles = get_binned_quantiles(session)
         bayes = get_bayes(binned_counts)
-        w = np.ones([binned_counts.shape[0]])
-        bayes[np.arange(len(bayes)), :, binned_quantiles[:, 0]]
 
+        # fit_by_random(bayes, binned_counts, binned_x, binned_quantiles)
 
-        print('done')
+        w = np.load(os.path.join(os.getcwd(), 'weights.npy'))
+        plt.plot(w)
+        plt.show()
+        pred = np.array(list(map(predict, repeat(bayes), binned_quantiles.T, repeat(w))))
+        com = center_of_mass(pred)
+        score = score_model(binned_x, com, plot=True, log=True)
+
+        coms = []
+        for b in np.unique(binned_x):
+            b_filter = b == binned_x
+            # plt.plot(pred[b_filter].T)
+            # plt.title(f'bin {b}')
+            # plt.show()
+            # plt.plot(np.mean(pred[b_filter], axis=0))
+            # plt.title(f'bin {b}')
+            # plt.show()
+            coms.append(center_of_mass(np.mean(pred[b_filter], axis=0)[None, :]))
+        plt.plot(coms)
+        plt.show()
+
+        binned_pred = prediction_model(com, binned_x)
+        compare(session, binned_pred, binned_x)
 
         # blocks = intervals_df.block.unique()
         # blocks.sort()
