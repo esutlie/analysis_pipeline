@@ -13,6 +13,8 @@ import warnings
 from concurrent.futures import ProcessPoolExecutor
 from itertools import repeat
 from thread_function import thread_function, model, get_isomap, get_x
+from scipy.stats import ttest_ind
+import seaborn as sns
 
 plasma = matplotlib.cm.get_cmap('plasma')
 
@@ -280,6 +282,128 @@ def isomap_single():
         # backend.save_fig(reward_fig, f'{session}_reward_isomap', 'isomaps')
 
 
+def make_slope_df(interval_ids, x, prediction, intervals_df, plot=False):
+    y_ints = []
+    slopes = []
+    scores = []
+    for i in np.unique(interval_ids):
+        i_filter = interval_ids == i
+        m = LinearRegression()
+        m.fit(x[i_filter].reshape(-1, 1), prediction[i_filter])
+        pred = m.predict(x[i_filter].reshape(-1, 1))
+        score = m.score(x[i_filter].reshape(-1, 1), prediction[i_filter])
+        scores.append(score)
+        slopes.append(m.coef_[0])
+        y_ints.append(m.intercept_)
+        if plot:
+            plt.scatter(x[i_filter], prediction[i_filter])
+            plt.scatter(x[i_filter], pred)
+            plt.title(f'Regression Score = {score:.2f}')
+            plt.ylabel('Predicted Time (seconds)')
+            plt.xlabel('Actual Time (seconds)')
+            plt.show()
+    non_entry_df = intervals_df[(intervals_df.interval_phase == 1) | (intervals_df.interval_phase == 2)]
+    non_entry_df['slope'] = slopes
+    non_entry_df['y_ints'] = y_ints
+    non_entry_df['scores'] = scores
+    return non_entry_df
+
+
+def slope_plots(slope_df):  # slope_df only has phase 1 and phase 2 intervals
+    color_sets = backend.get_color_sets()
+    blocks = slope_df.block.unique()
+    blocks.sort()
+    b1 = slope_df.block == blocks[0]
+    b2 = slope_df.block == blocks[1]
+    phase1 = slope_df.interval_phase == 1
+    phase2 = slope_df.interval_phase == 2
+    good_score = slope_df.scores > .9
+    slope_df['length'] = slope_df['interval_ends'] - slope_df['interval_starts']
+    trial_exits = []
+    exits = []
+    for trial in np.unique(slope_df[phase2].interval_trial):
+        exit = slope_df[(slope_df.interval_trial == trial) & phase2].length.values[0]
+        trial_exits.append([exit] * np.sum(slope_df.interval_trial == trial))
+        exits.append(exit)
+    num_groups = 3
+    q_ranges = np.linspace(0, 1, num_groups + 1)
+    quantiles = [np.quantile(exits, q) for q in q_ranges]
+    quants = np.array([sum(length >= np.array(quantiles)) - 1 for length in exits])
+    leave_groups = []
+    for i, trial in enumerate(np.unique(slope_df[phase2].interval_trial)):
+        leave_groups.append([quants[i]] * np.sum(slope_df.interval_trial == trial))
+    slope_df['leave_time'] = backend.flatten_list(trial_exits)
+    slope_df['leave_time_group'] = backend.flatten_list(leave_groups)
+
+    quantiles = [np.quantile(slope_df[phase2].slope, q) for q in q_ranges]
+    quants = np.array([sum(length >= np.array(quantiles)) - 1 for length in slope_df[phase2].slope])
+    slope_groups = []
+    for i, trial in enumerate(np.unique(slope_df[phase2].interval_trial)):
+        slope_groups.append([quants[i]] * np.sum(slope_df.interval_trial == trial))
+    slope_df['slope_group'] = backend.flatten_list(slope_groups)
+
+    # Plot x:block, y:leave_time, hue:slope
+    data = slope_df[good_score & phase2]
+    ax = sns.scatterplot(data=data, x='slope', y='leave_time', hue='block', palette=color_sets['set2'][:2])
+    # ax.legend_.remove()
+    ax.set_ylim([0, ax.get_ylim()[1]])
+    ax.set_ylabel('Leave Time (seconds)')
+    ax.set_xlabel('Slope')
+    plt.show()
+
+    # Plot prediction over actual for every interval
+
+    # Plot leave time regression against all slopes and y-ints
+    for i in ['slope', 'y_ints']:
+        m = LinearRegression()
+        x = slope_df[good_score][i].to_numpy().reshape(-1, 1)
+        y = slope_df[good_score].leave_time
+        m.fit(x, y)
+        m.score(x, y)
+        pred = m.predict(x)
+        plt.scatter(x, y)
+        plt.scatter(x, pred)
+        plt.title(f'Regression Score = {m.score(x, y)}')
+        plt.ylabel('Leave Time (seconds)')
+        plt.xlabel('Y-Intercept') if i == 'y_ints' else plt.xlabel('Slope')
+        plt.show()
+
+    # Plot leave time regression against only exit interval slopes and y-ints
+    for i in ['slope', 'y_ints']:
+        m = LinearRegression()
+        x = slope_df[good_score & phase2][i].to_numpy().reshape(-1, 1)
+        constant = 0 if x.min() > 0 else .1 - x.min()
+        y = slope_df[good_score & phase2].leave_time
+        x_linspace = np.linspace(x.min(), x.max(), 20).reshape(-1, 1)
+        m.fit(np.log(x + constant), y)
+        score = m.score(np.log(x + constant), y)
+        pred = m.predict(np.log(x_linspace + constant))
+        plt.scatter(x, y)
+        plt.plot(x_linspace, pred)
+        plt.title(f'Regression Score = {score}')
+        plt.ylabel('Leave Time (seconds)')
+        plt.xlabel('Y-Intercept') if i == 'y_ints' else plt.xlabel('Slope')
+        plt.show()
+
+    # slope and y-intercept separated by block
+    for i in ['slope', 'y_ints']:
+        slopes_b1 = slope_df[good_score & b1][i].values
+        slopes_b2 = slope_df[good_score & b2][i].values
+        plt.scatter(np.ones(len(slopes_b1)) + np.random.random(len(slopes_b1)) * .3 - .15, slopes_b1,
+                    c=color_sets['set2'][0])
+        plt.scatter(np.ones(len(slopes_b2)) * 2 + np.random.random(len(slopes_b2)) * .3 - .15, slopes_b2,
+                    c=color_sets['set2'][1])
+        plt.hlines(np.mean(slopes_b1), 1 - .15, 1 + .15, color=color_sets['set2_med_dark'][0])
+        plt.hlines(np.mean(slopes_b2), 2 - .15, 2 + .15, color=color_sets['set2_med_dark'][1])
+        test = ttest_ind(slopes_b1, slopes_b2)
+        plt.ylabel('Y-Intercept') if i == 'y_ints' else plt.ylabel('Slope')
+        plt.xlabel('Block')
+        plt.xlim([.7, 2.3])
+        plt.xticks([1, 2], blocks)
+        plt.title(f'p = {test.pvalue}')
+        plt.show()
+
+
 def pretty_plot(session):
     color_sets = backend.get_color_sets()
 
@@ -293,8 +417,8 @@ def pretty_plot(session):
     blocks.sort()
     phases = get_phase(interval_ids, intervals_df)
     x_blocks = get_block(interval_ids, intervals_df)
-    phase_filter = np.where((phases == 2))[0]
-    # phase_filter = np.where((phases == 1) | (phases == 2))[0]
+    # phase_filter = np.where((phases == 2))[0]
+    phase_filter = np.where((phases == 1) | (phases == 2))[0]
     convolved_spikes = convolved_spikes[:, phase_filter]
     interval_ids = interval_ids[phase_filter]
     x_blocks = x_blocks[phase_filter]
@@ -307,6 +431,10 @@ def pretty_plot(session):
     fit_model_b2, x_b2 = model(interval_ids[x_blocks == blocks[1]], transformed_spikes[x_blocks == blocks[1]], 'linear',
                                return_model=True)
     prediction = fit_model.predict(transformed_spikes)
+
+    non_entry_df = make_slope_df(interval_ids, x, prediction, intervals_df, plot=False)
+    slope_plots(non_entry_df)
+
     prediction_fit_to1 = fit_model_b1.predict(transformed_spikes)
     prediction_fit_to2 = fit_model_b2.predict(transformed_spikes)
     titles = ['fit to average', f'fit to block {blocks[0]}', f'fit to block {blocks[1]}']
@@ -316,7 +444,8 @@ def pretty_plot(session):
             plt.scatter(x[i], pred[i], s=1, c=color_sets['set2'][c])
         plt.xlabel('real time')
         plt.ylabel('predicted time')
-        plt.title(titles[k])
+        plt.title(session)
+        # plt.title(titles[k])
         plt.show()
         plt.plot()
         y_max = []
@@ -338,9 +467,12 @@ def pretty_plot(session):
         plt.ylabel('predicted time')
         # plt.legend(['true'] + list(blocks))
         plt.ylim([-.3, max(y_max) + .3])
-        plt.title(titles[k])
+        plt.title(session)
+        # plt.title(titles[k])
         plt.show()
-    plot_isomap(transformed_spikes, interval_ids, intervals_df, session)
+        break
+
+    # plot_isomap(transformed_spikes, interval_ids, intervals_df, session)
     plot_multicolor(transformed_spikes, interval_ids, intervals_df, session, dims=2)
     # plot_multicolor(transformed_spikes, interval_ids, intervals_df, session, dims=3)
 
@@ -348,6 +480,8 @@ def pretty_plot(session):
 def plot_multicolor(transformed_spikes, interval_ids, intervals_df, session, dims=2):
     color_sets = backend.get_color_sets()
     fit_model, x = model(interval_ids, transformed_spikes, 'linear', return_model=True)
+
+    # reward to reward and reward to exit, plasma
     if dims == 2:
         fig, ax = plt.subplots(1, 1, figsize=(10, 6))
     else:
@@ -361,7 +495,6 @@ def plot_multicolor(transformed_spikes, interval_ids, intervals_df, session, dim
         sc = ax.scatter(spikes[:, 0], spikes[:, 1], c=x, cmap="plasma", vmin=0, vmax=max(x) * .7, s=1)
     else:
         sc = ax.scatter3D(spikes[:, 0], spikes[:, 1], spikes[:, 2], c=x, cmap="plasma", vmin=0, vmax=max(x), s=1)
-
     ax.set_title(session)
     color_bar = plt.colorbar(sc)
     color_bar.set_label('time (seconds)')
@@ -369,6 +502,7 @@ def plot_multicolor(transformed_spikes, interval_ids, intervals_df, session, dim
     ax.set_ylabel('Isomap Component 2')
     plt.show()
 
+    # reward to reward and reward to exit, colored by block
     fig, ax = plt.subplots(1, 1, figsize=(8, 6))
     blocks = intervals_df.block.unique()
     blocks.sort()
@@ -379,22 +513,63 @@ def plot_multicolor(transformed_spikes, interval_ids, intervals_df, session, dim
     ax.set_title(session)
     ax.set_xlabel('Isomap Component 1')
     ax.set_ylabel('Isomap Component 2')
+    y_lims = ax.get_ylim()
+    x_lims = ax.get_xlim()
     plt.show()
 
-    fig, ax = plt.subplots(1, 1, figsize=(8, 6))
+    # plasma but with exits only
+    fig, ax = plt.subplots(1, 1, figsize=(10, 6))
+    phases = get_phase(interval_ids, intervals_df)
+    phase_filter = phases == 2
+    spikes_exits = transformed_spikes[phase_filter, :]
+    x_exits = x[phase_filter]
+    sc = ax.scatter(spikes_exits[:, 0], spikes_exits[:, 1], c=x_exits, cmap="plasma", vmin=0, vmax=max(x) * .7, s=1)
+
+    ax.set_title(session + ' reward to exit only')
+    color_bar = plt.colorbar(sc)
+    color_bar.set_label('time (seconds)')
+    ax.set_xlim(x_lims)
+    ax.set_ylim(y_lims)
+    ax.set_xlabel('Isomap Component 1')
+    ax.set_ylabel('Isomap Component 2')
+    plt.show()
+
+    # colored by interval length, exits only, separated by block into two figures
+    phases = get_phase(interval_ids, intervals_df)
+    phase_filter = phases == 2
+    x_blocks = get_block(interval_ids, intervals_df)
+
     intervals_df['length'] = intervals_df['interval_ends'] - intervals_df['interval_starts']
-    lengths = intervals_df.length.loc[np.unique(interval_ids)]
+    lengths = intervals_df.length.loc[np.unique(interval_ids[phase_filter])]
     num_groups = 3
+
     time_groups = np.array_split(np.array(lengths.index[np.argsort(lengths.values)]), num_groups)
     colors = [color_sets['set2'], color_sets['set2_med_dark'], color_sets['set2_dark']]
 
     for b in range(len(blocks)):
-        for j in range(num_groups):
-            time_cutoff = np.array([val in time_groups[j] for val in interval_ids[phase_filter]])
+        fig, ax = plt.subplots(1, 1, figsize=(8, 6))
+        for j in np.arange(num_groups)[::-1]:
+            time_cutoff = np.array([val in time_groups[j] for val in interval_ids])
             block_spikes = spikes[(x_blocks == blocks[b]) & time_cutoff, :]
             t = x[(x_blocks == blocks[b]) & time_cutoff]
-            sc = ax.scatter(block_spikes[:, 0], block_spikes[:, 1],  c=list(colors[j][b]), s=1)
-        ax.set_title(session + ' block ' + blocks[b])
+            sc = ax.scatter(block_spikes[:, 0], block_spikes[:, 1], c=list(colors[j][b]), s=1)
+        ax.set_title(session + ', block ' + blocks[b])
+        ax.set_xlabel('Isomap Component 1')
+        ax.set_ylabel('Isomap Component 2')
+        ax.set_xlim(x_lims)
+        ax.set_ylim(y_lims)
+        plt.show()
+
+        # also plotting with plasma
+        fig, ax = plt.subplots(1, 1, figsize=(10, 6))
+        spikes_exits = transformed_spikes[(x_blocks == blocks[b]) & phase_filter, :]
+        x_exits = x[(x_blocks == blocks[b]) & phase_filter]
+        sc = ax.scatter(spikes_exits[:, 0], spikes_exits[:, 1], c=x_exits, cmap="plasma", vmin=0, vmax=max(x) * .7, s=1)
+        ax.set_title(session + ', block ' + blocks[b])
+        color_bar = plt.colorbar(sc)
+        color_bar.set_label('time (seconds)')
+        ax.set_xlim(x_lims)
+        ax.set_ylim(y_lims)
         ax.set_xlabel('Isomap Component 1')
         ax.set_ylabel('Isomap Component 2')
         plt.show()
@@ -403,10 +578,11 @@ def plot_multicolor(transformed_spikes, interval_ids, intervals_df, session, dim
 def plot_scores(session):
     unit_order_record = get_saved_isomap_units()
     unit_order = unit_order_record[f'{session}_out']
-    fig, ax = plt.subplots(1, 1, figsize=[6, 8])
-    ax.plot(unit_order[1])
-    ax.set_xlabel('number of units')
-    ax.set_ylabel('model score')
+    fig, ax = plt.subplots(1, 1, figsize=[8, 6])
+    ax.plot(unit_order[1][::-1])
+    ax.set_xlabel('Number of Units')
+    ax.set_ylabel('Model Score')
+    ax.set_title('Leave One Out Scores')
     plt.show()
 
 
@@ -432,5 +608,6 @@ if __name__ == '__main__':
         if sess != 'ES029_2022-09-14_bot72_0_g0':
             continue
         # leave_one_out(sess, multi_core=False)
-        pretty_plot(sess)
-        # plot_scores(sess)
+        # pretty_plot(sess)
+        plot_scores(sess)
+        # Next I need to redo the leave one out but testing each number of components to find the best one.

@@ -6,6 +6,7 @@ import backend
 set2 = sns.color_palette(palette='Set2')
 color_sets = backend.get_color_sets()
 
+
 def trial_raster():
     return {
         'Reward': 'purple',
@@ -33,6 +34,15 @@ def blocks():
         '0.8 r/s': set2[1],
     }
 
+
+def short_med_long(block):
+    return {
+        'Short': color_sets['set2'][block],
+        'Medium': color_sets['set2_med_dark'][block],
+        'Long': color_sets['set2_dark'][block],
+    }
+
+
 def pca_cluster_activity():
     return {
         'Cluster 1 - Low': set2[0],
@@ -42,6 +52,7 @@ def pca_cluster_activity():
         'Cluster 3 - Low': set2[2],
         'Cluster 3 - High': color_sets['set2_dark'][2],
     }
+
 
 def separate_legend(entries, file_name=None, marker='|'):
     properties = {
@@ -74,3 +85,5 @@ if __name__ == '__main__':
     separate_legend(blocks(), file_name='block_dots.png', marker='.')
     separate_legend(blocks(), file_name='block_lines.png', marker='_')
     separate_legend(pca_cluster_activity(), file_name='pca_cluster_activity.png', marker='_')
+    separate_legend(short_med_long(0), file_name='short_med_long_b1.png', marker='_')
+    separate_legend(short_med_long(1), file_name='short_med_long_b2.png', marker='_')

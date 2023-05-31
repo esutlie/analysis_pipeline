@@ -52,7 +52,7 @@ def get_binned_quantiles(session, verbose=False, regenerate=False):
                 groups = np.sum(np.stack(np.array_split(trial_spikes, num_groups)), axis=1)
                 bin_counts.append(groups.astype(int))
                 if unit == 0:
-                    binned_intervals.append([trial]*num_groups)
+                    binned_intervals.append([trial] * num_groups)
         all_counts = np.hstack(bin_counts)
         non_zero_counts = all_counts[all_counts != 0]
         quants = [np.quantile(non_zero_counts, q) for q in np.linspace(0, 1 - 1 / num_quantiles, num_quantiles)]
@@ -122,7 +122,7 @@ def score_model(x, y, plot=False, log=True):
     return score
 
 
-def prediction_model(x, y, plot=False):
+def prediction_model(x, y, plot=True):
     y = np.log(y + 1)
     x = x.reshape(-1, 1)
     model = LinearRegression()
@@ -141,6 +141,14 @@ def prediction_model(x, y, plot=False):
 def score_by_local(x):
     top = np.argsort(x)[-3:] if np.argmax(x) != 0 else np.argsort(x)[-2:]
     return sum(top * x[top]) / sum(x[top])
+
+
+def score_by_accuracy(pred, binned_x):
+    main_score = pred[np.arange(len(pred)), binned_x]
+    left_score = pred[np.arange(len(pred)), binned_x - 1]
+    right_score = pred[np.arange(len(pred)), binned_x + 1]
+    score = main_score + .3 * right_score + .3 * left_score
+    return np.mean(score)
 
 
 def fit_by_random(bayes, binned_counts, binned_x, binned_quantiles):
@@ -165,18 +173,19 @@ def fit_by_random(bayes, binned_counts, binned_x, binned_quantiles):
             temp_weights[i % len(w)] *= delta
             temp_weights /= np.max(temp_weights)
             pred = np.array(list(map(predict, repeat(bayes), binned_quantiles.T, repeat(temp_weights))))
+            # score = score_by_accuracy(pred, binned_x)
             com = center_of_mass(pred)
             score = score_model(binned_x, com, plot=False, log=True)
             history.append(score)
         w[i % len(w)] *= deltas[np.argmax(history)]
         w /= np.max(w)
         print(f'{i} score: {np.max(history)}     {deltas[np.argmax(history)]}')
-        if i % 100 == 0:
-            np.save(os.path.join(os.getcwd(), 'weights.npy'), w)
-            plt.plot(w)
-            plt.show()
-            print('score improved by: ' + abs(score - score_memory))
-            if abs(score - score_memory) < .001:
+        if i % len(bayes) == 0:
+            np.save(os.path.join(os.getcwd(), 'weights2.npy'), w)
+            # plt.plot(w)
+            # plt.show()
+            print('score improved by: ' + str(abs(score - score_memory)))
+            if abs(score - score_memory) < .001 and i != 0:
                 break
             score_memory = score
     return w
@@ -199,20 +208,30 @@ def fit_by_exclude(bayes, binned_counts, binned_x, binned_quantiles):  # Not don
         print(score)
 
 
-def compare(session, binned_pred, binned_x):
+def compare(session, binned_pred, binned_x, binned_intervals):
+    color_sets = backend.get_color_sets()
     local_path = os.path.join(backend.get_data_path(), session)
-    interval_ids_path = os.path.join(local_path, 'interval_ids.npy')
     intervals_df_path = os.path.join(local_path, 'intervals_df.pkl')
-    interval_ids = np.load(interval_ids_path)
     intervals_df = pd.read_pickle(intervals_df_path)
+    blocks = intervals_df.block.unique()
+    blocks.sort()
+    binned_blocks = get_block(binned_intervals, intervals_df)
+    block_means = []
+    for i, b in enumerate(blocks):
+        b_filter = b == binned_blocks
+        plt.scatter(binned_x[b_filter] * .3 + np.random.random(np.sum(b_filter)) * .1, binned_pred[b_filter] * .3,
+                    c=color_sets['set2'][i], s=1)
+        means = []
+        for j, bin_num in enumerate(np.unique(binned_x)):
+            bin_filter = binned_x == bin_num
+            means.append(np.mean(binned_pred[b_filter & bin_filter] * .3))
+        block_means.append(means)
+        plt.plot(np.unique(binned_x) * .3, means, c=color_sets['set2'][i])
 
-    interval = 0
-    interval_x = []
-    for i, x in enumerate(binned_x):
-        if i != 0 and x == 0:
-            interval += 1
-        interval_x.append(interval)
-    interval_x = np.array(interval_x)
+    plt.xlabel('Real Time Bins')
+    plt.ylabel('Predicted Time Bins')
+    plt.show()
+
     print()
 
 
@@ -222,70 +241,39 @@ def main():
     for session in files:
         if session != 'ES029_2022-09-14_bot72_0_g0':
             continue
+        """I think the problem is that I've lost too much sensitivity in the blocking. Find a way to do this with the 
+        continuous values and it might work."""
         binned_counts, binned_x, binned_quantiles, binned_intervals = get_binned_quantiles(session)
+        non_zeros = binned_x != 0
+        binned_x = binned_x[non_zeros]
+        binned_quantiles = binned_quantiles[:, non_zeros]
+        binned_intervals = binned_intervals[non_zeros]
+
         bayes = get_bayes(binned_counts)
+        # w = fit_by_random(bayes, binned_counts, binned_x, binned_quantiles)
 
-        # fit_by_random(bayes, binned_counts, binned_x, binned_quantiles)
-
-        w = np.load(os.path.join(os.getcwd(), 'weights.npy'))
+        w = np.load(os.path.join(os.getcwd(), 'weights2.npy'))
         plt.plot(w)
         plt.show()
         pred = np.array(list(map(predict, repeat(bayes), binned_quantiles.T, repeat(w))))
         com = center_of_mass(pred)
         score = score_model(binned_x, com, plot=True, log=True)
 
-        coms = []
-        for b in np.unique(binned_x):
-            b_filter = b == binned_x
-            # plt.plot(pred[b_filter].T)
-            # plt.title(f'bin {b}')
-            # plt.show()
-            # plt.plot(np.mean(pred[b_filter], axis=0))
-            # plt.title(f'bin {b}')
-            # plt.show()
-            coms.append(center_of_mass(np.mean(pred[b_filter], axis=0)[None, :]))
-        plt.plot(coms)
-        plt.show()
+        # coms = []
+        # for b in np.unique(binned_x):
+        #     b_filter = b == binned_x
+        #     # plt.plot(pred[b_filter].T)
+        #     # plt.title(f'bin {b}')
+        #     # plt.show()
+        #     plt.plot(np.mean(pred[b_filter], axis=0))
+        #     plt.title(f'bin {b}')
+        #     plt.show()
+        #     coms.append(center_of_mass(np.mean(pred[b_filter], axis=0)[None, :]))
+        # plt.plot(coms)
+        # plt.show()
 
         binned_pred = prediction_model(com, binned_x)
-        compare(session, binned_pred, binned_x)
-
-        # blocks = intervals_df.block.unique()
-        # blocks.sort()
-        # block = get_block(interval_ids, intervals_df)
-        #
-        # phases = get_phase(interval_ids, intervals_df)
-        # phase_filter = np.where((phases == 2))[0]
-        # spikes_to_use = spikes_to_use[:, phase_filter]
-        # interval_ids = interval_ids[phase_filter]
-        # block = block[phase_filter]
-        #
-        # high_fr = np.where(np.mean(original_spikes, axis=1) * 1000 > 1)[0]
-        # times, longest = get_x(interval_ids, min_longest=1)
-        # lengths = intervals_df.length.loc[np.unique(interval_ids)]
-        # num_groups = 3
-        # time_groups = np.array_split(np.array(lengths.index[np.argsort(lengths.values)]), num_groups)
-        # colors = [color_sets['set2'], color_sets['set2_med_dark'], color_sets['set2_dark']]
-        # # means = []
-        # # stds = []
-        # # x_s = []
-        # # com_s = []
-        # # order = []
-        # for unit in high_fr:
-        #     for i, b in enumerate(blocks):
-        #         for j in range(num_groups):
-        #             time_cutoff = np.array([val in time_groups[j] for val in interval_ids])
-        #             spikes = spikes_to_use[:, (b == block) & time_cutoff]
-        #             spikes = spikes[unit]
-        #             t = times[(b == block) & time_cutoff]
-        #             mean_spikes, std_spikes, x = get_mean(spikes.T, t)
-        #             mean_spikes = convolve1d(mean_spikes.T, kernel).T  # if using original spikes
-        #             # means.append(mean_spikes * 1000)
-        #             # stds.append(std_spikes)
-        #             # x_s.append(x)
-        #             plt.plot(x, mean_spikes * 1000, c=list(colors[j][i]))
-        #         plt.title(f'unit {unit}, block {b}')
-        #         plt.show()
+        compare(session, binned_pred, binned_x, binned_intervals)
 
 
 if __name__ == '__main__':
