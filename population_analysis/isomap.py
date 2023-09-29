@@ -1,5 +1,5 @@
 from sklearn.manifold import Isomap
-from create_bins_df import create_precision_df
+from create_bins_df import create_precision_df, get_phase, get_block
 import backend
 import numpy as np
 import matplotlib.pyplot as plt
@@ -197,26 +197,6 @@ def plot_isomap(transformed_spikes, interval_ids, intervals_df, session):
     # reward_fig.suptitle(f'session {session} reward')
     reward_fig.suptitle(f'{session}')
     plt.show()
-
-
-def get_phase(interval_ids, intervals_df):
-    x_total = []
-    for i in np.unique(interval_ids):
-        num = len(np.where(interval_ids == i)[0])
-        phase = intervals_df.loc[i].interval_phase
-        x_total.append([phase] * num)
-    phase = np.concatenate(x_total)
-    return phase
-
-
-def get_block(interval_ids, intervals_df):
-    x_total = []
-    for i in np.unique(interval_ids):
-        num = len(np.where(interval_ids == i)[0])
-        block = intervals_df.loc[i].block
-        x_total.append([block] * num)
-    block = np.concatenate(x_total)
-    return block
 
 
 def isomap_single():

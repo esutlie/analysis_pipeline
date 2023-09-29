@@ -1,5 +1,5 @@
 from sklearn.manifold import Isomap
-from create_bins_df import create_precision_df, get_gaussian_kernel
+from create_bins_df import create_precision_df, get_phase, get_block, get_x
 import backend
 import numpy as np
 import matplotlib.pyplot as plt
@@ -9,8 +9,6 @@ import json
 import os
 from backend import get_data_path
 import time
-from isomap import get_phase, get_block
-from thread_function import get_x
 from sklearn.preprocessing import minmax_scale
 from scipy.ndimage import convolve1d
 import math

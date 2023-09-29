@@ -1,13 +1,13 @@
 import os
 import backend
 
-def get_session_list():
+def get_session_list(photometry=False):
     """
     get list of locally stored sessions for iterating through file paths
     :return: list
     """
     directory_list = []
-    local_path = backend.get_data_path()
+    local_path = backend.get_data_path(photometry=photometry)
     # local_path = os.path.join(os.path.dirname(os.getcwd()), 'z_sessions')
 
     # Walk through directory

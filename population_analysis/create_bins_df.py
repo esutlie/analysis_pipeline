@@ -7,7 +7,7 @@ import numpy as np
 import math
 from scipy.ndimage import convolve1d
 import os
-import matplotlib.pyplot as plt
+from scipy.interpolate import griddata
 
 
 def get_trial_group(events):
@@ -18,8 +18,8 @@ def get_trial_group(events):
     return pd.Series(block_idx, index=np.unique(pi_events_shortened.trial))
 
 
-def create_precision_df(session, kernel_size=1000, regenerate=False):
-    local_path = os.path.join(backend.get_data_path(), session)
+def create_precision_df(session, kernel_size=1000, regenerate=False, photometry=False):
+    local_path = os.path.join(backend.get_data_path(photometry=photometry), session)
     normalized_spikes_path = os.path.join(local_path, 'normalized_spikes.npy')
     convolved_spikes_path = os.path.join(local_path, 'convolved_spikes.npy')
     boxcar_spikes_path = os.path.join(local_path, 'boxcar_spikes.npy')
@@ -40,15 +40,15 @@ def create_precision_df(session, kernel_size=1000, regenerate=False):
     boxcar_kernel = get_boxcar_kernel(w=100)
     # plt.plot(kernel)
     # plt.show()
-    spikes, pi_events, cluster_info = backend.load_data(session)
-    if len(spikes) == 0:
+    spikes, pi_events, cluster_info = backend.load_data(session, photometry=photometry)
+
+    if len(spikes) == 0 or np.isnan(pi_events.trial.max()):
         return [None, None, None, None], None, None
-    clusters = np.unique(spikes.cluster)
     trial_blocks = pi_events.groupby('trial').phase.max()
     trial_group = get_trial_group(pi_events)
     interval_columns = ['interval_starts', 'interval_ends', 'interval_trial', 'interval_phase']
     intervals_df = pd.DataFrame(columns=interval_columns)
-    for entry_time, exit_time, reward_list, trial, actives in zip(*get_trial_events(pi_events)):
+    for entry_time, exit_time, reward_list, trial, _ in zip(*get_trial_events(pi_events)):
         interval_starts = [entry_time] + reward_list.tolist()
         interval_ends = reward_list.tolist() + [exit_time]
         interval_trial = [trial] * len(interval_starts)
@@ -66,15 +66,30 @@ def create_precision_df(session, kernel_size=1000, regenerate=False):
     for interval_idx, row in enumerate(intervals_df.values):
         [start, end, trial, phase, block, group] = row
         interval_spikes = spikes[(spikes.time > start) & (spikes.time < end)]
-        spike_times = interval_spikes.time.values
-        bins = ((spike_times - start).round(decimals=3) * 1000).astype(int)
-        interval_spikes['bin'] = bins
-        spike_rates = np.zeros([len(clusters), 1 + math.ceil((end - start) * 1000)])
-        for i, cluster in enumerate(clusters):
-            counts = interval_spikes[interval_spikes.cluster == cluster].groupby('bin').count().cluster
-            for index in counts.index:
-                spike_rates[i, index] = counts.loc[index]
-        interval_rates.append(np.sum(spike_rates, axis=1) / (end - start))
+        if photometry:
+            sensor_vals = interval_spikes[['green_right', 'green_left']].to_numpy()
+            x_origin = interval_spikes.time.values - start
+            if len(x_origin):
+                x_len = math.ceil(x_origin.max() * 1000)
+                x_map = np.linspace(0, x_len / 1000, x_len + 1)
+                if len(x_origin) > 1:
+                    spike_rates = griddata(x_origin, sensor_vals, x_map, method='nearest').T
+                else:
+                    spike_rates = np.repeat(sensor_vals, [len(x_map)], axis=0).T
+            else:
+                spike_rates = np.array([[np.nan], [np.nan]])
+            interval_rates.append(np.mean(spike_rates, axis=1) / (end - start))
+        else:
+            clusters = np.unique(spikes.cluster)
+            spike_times = interval_spikes.time.values
+            bins = ((spike_times - start).round(decimals=3) * 1000).astype(int)
+            interval_spikes['bin'] = bins
+            spike_rates = np.zeros([len(clusters), 1 + math.ceil((end - start) * 1000)])
+            for i, cluster in enumerate(clusters):
+                counts = interval_spikes[interval_spikes.cluster == cluster].groupby('bin').count().cluster
+                for index in counts.index:
+                    spike_rates[i, index] = counts.loc[index]
+            interval_rates.append(np.sum(spike_rates, axis=1) / (end - start))
         filtered_interval_arrays.append(convolve1d(spike_rates, kernel))
         boxcar_interval_arrays.append(convolve1d(spike_rates, boxcar_kernel))
         original_interval_arrays.append(spike_rates)
@@ -94,6 +109,39 @@ def create_precision_df(session, kernel_size=1000, regenerate=False):
     np.save(interval_ids_path, interval_ids)
     intervals_df.to_pickle(intervals_df_path)
     return [normalized_spikes, convolved_spikes, boxcar_spikes, original_spikes], interval_ids, intervals_df
+
+
+def get_phase(interval_ids, intervals_df):
+    x_total = []
+    for i in np.unique(interval_ids):
+        num = len(np.where(interval_ids == i)[0])
+        phase = intervals_df.loc[i].interval_phase
+        x_total.append([phase] * num)
+    phase = np.concatenate(x_total)
+    return phase
+
+
+def get_block(interval_ids, intervals_df):
+    x_total = []
+    for i in np.unique(interval_ids):
+        num = len(np.where(interval_ids == i)[0])
+        block = intervals_df.loc[i].block
+        x_total.append([block] * num)
+    block = np.concatenate(x_total)
+    return block
+
+
+def get_x(interval_ids, min_longest=1):
+    x_total = []
+    for i in np.unique(interval_ids):
+        num = len(np.where(interval_ids == i)[0])
+        x_total.append(np.linspace(0, (num - 1) / 1000, num))
+    longest = np.argsort(np.array([len(x_i) for x_i in x_total]), axis=0)[-min_longest]
+    # longest = np.argmax(np.array([len(x_i) for x_i in x_total]))
+    longest = x_total[longest]
+    x = np.concatenate(x_total)
+    x = np.around(x, 3)
+    return x, longest
 
 
 def create_bins_df(session):
@@ -160,7 +208,14 @@ def get_boxcar_kernel(w=10):
 #     plt.plot(convolve1d(spike_rates, get_gaussian_kernel(l=300, sigma=300 / 5))[i])
 #     plt.show()
 
+def regen_all():
+    files = backend.get_session_list()
+    for session in files:
+        [_, _, _, _], interval_ids, intervals_df = create_precision_df(session, regenerate=False)
+
 if __name__ == '__main__':
-    first_session = backend.get_session_list()[0]
+    # first_session = backend.get_session_list()[0]
     # create_bins_df(first_session)
-    create_precision_df(first_session)
+    # create_precision_df(first_session)
+    regen_all()
+

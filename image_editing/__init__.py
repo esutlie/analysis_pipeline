@@ -1,2 +1,2 @@
 from .load_pictures import load_pictures
-from .crop_slices import crop_slices
+from .step_1_crop import crop_slices

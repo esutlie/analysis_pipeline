@@ -127,3 +127,16 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+/image_editing/atlas_files/
+/image_editing/old/
+/image_editing/pics/
+/image_editing/probe_info/
+/image_editing/reg_pics/
+/image_editing/pics_to_send/
+/z_behavior/
+/z_sessions/
+/z_photometry/
+/z_sessions_old/
+/population_analysis/figures/
+/plotting/figures/
+/models/figures/

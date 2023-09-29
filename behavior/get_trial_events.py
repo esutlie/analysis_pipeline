@@ -17,7 +17,7 @@ def get_trial_events(data, entry_tolerance=.5, exit_tolerance=2, include_unrewar
         reward_times = data[reward & port1 & start & (data.trial == trial_number)].time.values
         lick_times = data[lick & port1 & start & (data.trial == trial_number)].time.values
         trial_block = data[(data.trial == trial_number)].phase.iloc[0]
-        port2_time = 10 if trial_block == '0.4' else 5
+        port2_time = 10 if trial_block in ['0.4', '.4'] else 5
 
         if not len(exit_times):
             continue
