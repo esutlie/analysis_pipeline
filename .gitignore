@@ -127,7 +127,6 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
-/image_editing/atlas_files/
 /image_editing/old/
 /image_editing/pics/
 /image_editing/probe_info/
