@@ -186,7 +186,7 @@ def create_bins_df(session):
 
 
 def get_gaussian_kernel(l=5, sigma=1.):
-    """\
+    """
     creates gaussian kernel with side length `l` and a sigma of `sig`
     """
     ax = np.linspace(-(l - 1) / 2., (l - 1) / 2., l)
@@ -211,7 +211,7 @@ def get_boxcar_kernel(w=10):
 def regen_all():
     files = backend.get_session_list()
     for session in files:
-        [_, _, _, _], interval_ids, intervals_df = create_precision_df(session, regenerate=False)
+        [_, _, _, _], interval_ids, intervals_df = create_precision_df(session, regenerate=True)
 
 if __name__ == '__main__':
     # first_session = backend.get_session_list()[0]

@@ -24,5 +24,5 @@ def pull_file(file_name):
 
 
 if __name__ == '__main__':
-    # initial_data_pull()
-    pull_file('cluster_info.pkl')
+    initial_data_pull()
+    # pull_file('cluster_info.pkl')

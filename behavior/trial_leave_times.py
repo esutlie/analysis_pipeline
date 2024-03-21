@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import backend
-from behavior.get_trial_events import get_trial_events
+from backend.get_trial_events import get_trial_events
 import pandas as pd
 import seaborn as sns
 from sklearn.linear_model import LinearRegression

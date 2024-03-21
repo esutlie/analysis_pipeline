@@ -104,5 +104,5 @@ def add_to_data():
 
 
 if __name__ == '__main__':
-    analyze_probe()
+    # analyze_probe()
     add_to_data()

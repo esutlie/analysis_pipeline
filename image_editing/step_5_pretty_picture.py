@@ -41,6 +41,8 @@ def make_atlas_pic():
     files = backend.get_session_list()
     unit_coords = []
     for session in files:
+        if session[:5] not in ['ES032']:
+            continue
         mouse = session[:5]
         probe_df_path = os.path.join(os.getcwd(), 'probe_info', f'{mouse}.pkl')
         local_path = os.path.join(backend.get_data_path(), session, 'cluster_info.pkl')
@@ -61,7 +63,6 @@ def make_atlas_pic():
     plt.imshow(voxels[int(np.round(np.mean(z)))], cmap=atlas_cmap, vmin=-1000, vmax=2000)
     plt.scatter(x, y, alpha=.1, s=3)
     plt.show()
-
 
 
 if __name__ == '__main__':
