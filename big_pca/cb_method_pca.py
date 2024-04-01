@@ -6,13 +6,7 @@ from wpca import WPCA
 import matplotlib.pyplot as plt
 
 
-def pca_scoring(j, normalized_spikes, intervals_df, leave_out_list):
-    if j in leave_out_list:
-        return None
-    show_plots = np.random.random() < .05
-    one_out_spikes = np.delete(normalized_spikes, [j] + leave_out_list, axis=0)
-    interval_spikes, intervals_df = extract_intervals(one_out_spikes, intervals_df)
-    activity_list = intervals_df.activity.to_list()
+def pca_scoring(activity_list, show_plots=False):
     pca, mean_transform = fit_weighted_pca(activity_list, show_plots=show_plots)
     component_weights = pca.explained_variance_ratio_
     scores = []
@@ -21,7 +15,7 @@ def pca_scoring(j, normalized_spikes, intervals_df, leave_out_list):
         scores.append(
             estimate_velocity(mean_transform, transformed_activity, component_weights, show_plots=False))
 
-    return [np.mean(scores), np.std(scores), j, pca]
+    return [np.mean(scores), np.std(scores), pca]
 
 
 def fit_weighted_pca(list_of_arr, show_plots=False):

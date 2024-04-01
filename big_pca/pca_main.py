@@ -2,9 +2,6 @@ import numpy as np
 from big_pca.a_bin_spikes import bin_spikes
 from big_pca.b_high_pass import high_pass
 from big_pca.c_leave_one_out import leave_one_out
-from big_pca.ca_extract_intervals import extract_intervals
-from big_pca.cb_fit_weighted_pca import fit_weighted_pca
-from big_pca.cc_estimate_velocity import estimate_velocity
 import backend
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import normalize
@@ -19,15 +16,16 @@ def run_pca(session):
     normalized_spikes = normalize(high_pass_spikes)
     normalized_spikes = normalized_spikes / np.std(normalized_spikes)
     intervals_df = backend.make_intervals_df(pi_events)
+    # intervals_df_shortened = intervals_df.loc[:10]
 
     print('starting leave one out')
 
-    leave_one_out(normalized_spikes, intervals_df)
+    leave_one_out(normalized_spikes, intervals_df, process=True, test=True)
 
 
 if __name__ == '__main__':
     session_list = backend.get_session_list()
-    run_pca(session_list[-5])
+    run_pca('ES039_2024-02-28_bot144_1_g0')
 
     # for session in session_list:
     #     run_pca(session)

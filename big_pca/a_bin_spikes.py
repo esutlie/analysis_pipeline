@@ -2,10 +2,14 @@ import numpy as np
 import math
 from scipy.stats import skewnorm
 
+
 def skewed_gaussian_kernel(size, alpha=5, loc=25, scale=100):
     kernel = np.zeros(size)
     for i in range(size):
         kernel[i] = skewnorm.pdf(i, alpha, loc, scale)
+    shift = np.max([kernel[0], kernel[-1]])
+    kernel -= shift
+    kernel[kernel < 0] = 0
     return kernel
 
 

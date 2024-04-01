@@ -27,3 +27,5 @@ from .timer import Timer
 from .make_intervals_df import make_intervals_df, get_trial_group
 from .multi_length_mean import multi_length_mean
 from .get_trial_events import get_trial_events
+from .make_color_gradient import make_color_gradient
+

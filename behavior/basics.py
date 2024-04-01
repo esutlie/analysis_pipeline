@@ -9,6 +9,7 @@ tasks = ['cued_no_forgo_forced', 'single_reward']
 
 
 def basics():
+    print('started')
     mouse_list = backend.get_directories(backend.get_pi_path())
     for mouse in mouse_list:
         total_rewards(mouse)
