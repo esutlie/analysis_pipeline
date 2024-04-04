@@ -84,9 +84,10 @@ def get_master_df(regenerate=False, add=True):
 
     # If we are regenerating or adding sessions, get a list of all the sessions and iterate through them
     t = backend.Timer()
-    session_list = backend.get_session_list()
-    if 'session' in master_df.keys():
-        session_list = [session for session in session_list if session not in master_df['session']]
+    session_list = ['ES039_2024-02-28_bot144_1_g0']
+    # session_list = backend.get_session_list()
+    # if 'session' in master_df.keys():
+    #     session_list = [session for session in session_list if session not in master_df['session']]
 
     for session in session_list:
         spikes, pi_events, cluster_info = backend.load_data(session, photometry=False)
@@ -119,4 +120,4 @@ def get_master_df(regenerate=False, add=True):
 
 
 if __name__ == '__main__':
-    get_master_df(regenerate=True)
+    get_master_df(regenerate=False, add=True)

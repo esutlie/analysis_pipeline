@@ -1,16 +1,8 @@
 import matplotlib.pyplot as plt
 import numpy as np
+from backend import make_color_gradient
 
-import backend
-from big_pca.ca_extract_intervals import extract_intervals
-from big_pca.ce_weighted_regression import weighted_regression
-from sklearn.linear_model import LinearRegression, HuberRegressor
-from backend import multi_length_mean, make_color_gradient
-from itertools import product
-
-# tic = backend.Timer()
-
-DISTANCE_METRIC = True
+DISTANCE_METRIC = False
 arg_func = np.argmin if DISTANCE_METRIC else np.argmax
 num_func = np.min if DISTANCE_METRIC else np.max
 
@@ -31,20 +23,28 @@ def sigmoid(x, plots=False):
     return 1 / (1 + np.exp(-(x - .7) * 10))
 
 
-def manhattan_distance_matrix(a, b, bounds=False, clip_long=False):
+def manhattan_distance_matrix(a, b, bounds=False, clip_long=False, distribute=False):
     if clip_long:
         if len(a.T) > len(b.T) * 3:
             a = a[:, :len(b.T) * 3].copy()
         elif len(b.T) > len(a.T) * 3:
             b = b[:, :len(a.T) * 3].copy()
+    try:
+        if bounds:
+            a -= a.min(axis=1)[:, None]
+            a /= a.max(axis=1)[:, None]
+            b -= b.min(axis=1)[:, None]
+            b /= b.max(axis=1)[:, None]
+    except Exception as e:
+        print(e)
+        print()
 
-    if bounds:
-        a -= a.min(axis=1)[:, None]
-        a /= a.max(axis=1)[:, None]
-        b -= b.min(axis=1)[:, None]
-        b /= b.max(axis=1)[:, None]
+    res = np.mean(np.abs(a[:, :, np.newaxis] - b[:, np.newaxis, :]), axis=0)
 
-    res = np.sum(np.abs(a[:, :, np.newaxis] - b[:, np.newaxis, :]), axis=0)/a.shape[0]
+    if distribute:
+        flat = res.flatten()
+        flat = np.argsort(np.argsort(flat)) / (len(flat) - 1)
+        res = np.reshape(flat, res.shape)
     return res
 
 
@@ -240,20 +240,19 @@ def recurrence(activity_list, show_plots=False):
     # tic.tic('start recurrence function')
     n = len(activity_list)
     scalar = make_relu(activity_list)
-
+    n_units = activity_list[0].shape[0]
+    mean_DM = np.zeros([n, n])
     scores = np.zeros([n, n])
     slopes = np.zeros([n, n])
     intercepts = np.zeros([n, n])
-    distance_max = []
     for i in range(n):
         for j in range(n):
-            if j <= i:
+            if j <= i or activity_list[i].shape[1] == 0 or activity_list[j].shape[1] == 0:
                 continue
             # print(f'i: {i}')
             # print(f'j: {j}')
             distance_matrix = manhattan_distance_matrix(activity_list[i], activity_list[j], bounds=True,
-                                                        clip_long=True)
-            distance_max.append(np.nanmax(distance_matrix))
+                                                        clip_long=True, distribute=True)
             # if distance_matrix.shape[0] < distance_matrix.shape[1]:
             #     distance_matrix = distance_matrix.T
 
@@ -265,14 +264,15 @@ def recurrence(activity_list, show_plots=False):
             scores[i, j] = score
             slopes[i, j] = m
             intercepts[i, j] = b
+            mean_DM[i, j] = np.mean(distance_matrix)
 
             scores[j, i] = score
             slopes[j, i] = m
             intercepts[j, i] = b
+            mean_DM[j, i] = np.mean(distance_matrix)
         # tic.tic(f'i: {i}')
-    print(f'mean distance: {np.mean(distance_max)} with num units={activity_list[0].shape[0]}')
     # tic.tic('recurrence loop finished')
-
+    print(f'{n_units} units, mean distance = {np.mean(mean_DM)}')
     scores[np.where(np.isnan(scores))] = np.max(scores) if DISTANCE_METRIC else 0
     mean_select = np.argsort(np.mean(scores, axis=0))[::1 if DISTANCE_METRIC else -1]
     slope_select = np.argsort(abs(np.median(slopes, axis=0) - 1), axis=0)
@@ -315,13 +315,6 @@ def recurrence(activity_list, show_plots=False):
     #                                                 clip_long=True)
     #     score, m, b = regression(distance_matrix, show_plots=True)
 
-    return [np.mean(scores[selection]), np.std(scores[selection]), [slopes[selection], intercepts[selection]]]
+    return [np.mean(scores[selection]), np.std(scores[selection]),
+            [selection, slopes[selection], intercepts[selection], scores[selection]]]
 
-
-'''
-pick best interval to use as base 
-get the slopes and intercepts of all the others compared to it
-average the scores
-use average to assess leave one out
-use slopes and intercepts to predict leave time
-'''
