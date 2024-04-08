@@ -15,7 +15,7 @@ def leave_one_out(normalized_spikes, intervals_df, session, process=False, test=
 
     n_units = normalized_spikes.shape[0]
     columns = ['num_units', 'mean_score', 'std_score', 'arr', 'leave_out']
-    save_path = os.path.join('results', session + '_recurrence.pkl')
+    save_path = os.path.join('results', session + '_recurrence_leave_out.pkl')
     if os.path.exists(save_path) and not test:
         res_df = pd.read_pickle(save_path)
         # '''temp section'''
@@ -26,7 +26,7 @@ def leave_one_out(normalized_spikes, intervals_df, session, process=False, test=
         leave_out_list = res_df.leave_out.iloc[-1]
     else:
         tic = backend.Timer()
-        initial = one_out_set_up(-1, func, normalized_spikes, intervals_df, [], test=test, show_plots=show_plots)
+        initial = one_out_set_up(None, func, normalized_spikes, intervals_df, [], test=test, show_plots=show_plots)
         leave_out_list = []
         res_df = pd.DataFrame([[n_units, initial[0], initial[1], initial[2], []]], columns=columns)
         if not test:
@@ -59,14 +59,14 @@ def leave_one_out(normalized_spikes, intervals_df, session, process=False, test=
                 result = future.result()
                 mean_scores.append(result[0])
                 std_scores.append(result[1])
-                arr_list.append(result[2])
+                arr_list.append(result[2] + [np.array(result[4])])
                 index_list.append(result[3])
         else:
             results = [func_partial(j) for j in range(n_units)]
             for result in results:
                 mean_scores.append(result[0])
                 std_scores.append(result[1])
-                arr_list.append(result[2])
+                arr_list.append(result[2] + [np.array(result[4])])
                 index_list.append(result[3])
         index_list = np.array(index_list)
         try:
@@ -108,6 +108,7 @@ def leave_one_out(normalized_spikes, intervals_df, session, process=False, test=
 
 
 def one_out_set_up(j, func, normalized_spikes, intervals_df, leave_out_list, test=False, show_plots=False):
+    tic = backend.Timer()
     if j in leave_out_list:
         return None
     if test:
@@ -121,5 +122,7 @@ def one_out_set_up(j, func, normalized_spikes, intervals_df, leave_out_list, tes
 
     interval_spikes, intervals_df = extract_intervals(one_out_spikes, intervals_df)
     activity_list = intervals_df.activity.to_list()
+    start_list = intervals_df.start.to_list()
     res = func(activity_list, show_plots=show_plots)
-    return res + [j]
+    tic.tic(f'finished one out for unit {j}')
+    return res + [j] + [start_list]

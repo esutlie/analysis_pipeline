@@ -2,7 +2,7 @@
 
 import pandas as pd
 import backend
-from behavior import get_trial_events
+from backend import get_trial_events
 import numpy as np
 import math
 from scipy.ndimage import convolve1d
@@ -54,7 +54,8 @@ def create_precision_df(session, kernel_size=1000, regenerate=False, photometry=
         interval_trial = [trial] * len(interval_starts)
         interval_phase = [0] + [1] * (len(reward_list) - 1) + [2] if len(reward_list) else [3]
         interval_data = np.array([interval_starts, interval_ends, interval_trial, interval_phase]).T
-        intervals_df = intervals_df.append(pd.DataFrame(interval_data, columns=interval_columns))
+        # intervals_df = intervals_df.append(pd.DataFrame(interval_data, columns=interval_columns))
+        intervals_df = pd.concat([intervals_df, pd.DataFrame(interval_data, columns=interval_columns)])
     intervals_df.reset_index(inplace=True, drop=True)
     intervals_df['block'] = trial_blocks.loc[intervals_df.interval_trial.values].values
     intervals_df['group'] = trial_group.loc[intervals_df.interval_trial.values].values
@@ -83,7 +84,8 @@ def create_precision_df(session, kernel_size=1000, regenerate=False, photometry=
             clusters = np.unique(spikes.cluster)
             spike_times = interval_spikes.time.values
             bins = ((spike_times - start).round(decimals=3) * 1000).astype(int)
-            interval_spikes['bin'] = bins
+            # interval_spikes['bin'] = bins
+            interval_spikes = interval_spikes.assign(bin=bins)
             spike_rates = np.zeros([len(clusters), 1 + math.ceil((end - start) * 1000)])
             for i, cluster in enumerate(clusters):
                 counts = interval_spikes[interval_spikes.cluster == cluster].groupby('bin').count().cluster
