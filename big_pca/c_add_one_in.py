@@ -26,9 +26,8 @@ def add_one_in(normalized_spikes, intervals_df, session, process=False, test=Fal
     if test:
         normalized_spikes = normalized_spikes[:5]
     if process:
-        executor = concurrent.futures.ProcessPoolExecutor(os.cpu_count() - 1)
+        executor = concurrent.futures.ProcessPoolExecutor(os.cpu_count() - 2)
     i = 1
-    add_in_list = [1, 10, 2, 8, 14, 3, 7, 17, 0, 11]  # TODO: remove this line
     while len(add_in_list) < n_units - 1:
         print(f'round {i} of add one in, {n_units} units')
         mean_scores = []
@@ -55,9 +54,10 @@ def add_one_in(normalized_spikes, intervals_df, session, process=False, test=Fal
                 arr_list.append(result[2] + [np.array(result[4])])
                 index_list.append(result[3])
         else:
-            # results = [func_partial(j) for j in range(n_units)]
-            results = [func_partial(None)]  # TODO: replace this line with the comment above
+            results = [func_partial(j) for j in range(n_units)]
             for result in results:
+                if result is None:
+                    continue
                 mean_scores.append(result[0])
                 std_scores.append(result[1])
                 arr_list.append(result[2] + [np.array(result[4])])
@@ -69,15 +69,13 @@ def add_one_in(normalized_spikes, intervals_df, session, process=False, test=Fal
                                                        num_func(mean_scores),
                                                        std_scores[arg_func(mean_scores)],
                                                        arr_list[arg_func(mean_scores)],
-                                                       add_in_list]],  # TODO: switch back to line below
-                                                     # add_in_list + [index_list[arg_func(mean_scores)]]]],
+                                                       add_in_list + [index_list[arg_func(mean_scores)]]]],
                                                      columns=columns)], axis=0)
         except Exception as e:
             print(e)
             print()
         if not test:
             res_df.to_pickle(save_path)
-        break  # TODO: remove break
         one_in_order = np.argsort(mean_scores)[::1 if DISTANCE_METRIC else -1]
         if len(one_in_order) > 100:
             add_in_list += index_list[one_in_order[:15]].tolist()

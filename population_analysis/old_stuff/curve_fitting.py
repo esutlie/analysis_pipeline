@@ -42,7 +42,7 @@ class Timer:
 class UnitData:
     def __init__(self, regenerate=False):
         self.columns = ['unit', 'height', 'function', 'spread_dif', 'max_spread', 'filter']
-        self.path = os.path.join(os.getcwd(), 'figures', 'curve_fit', 'unit_data.pkl')
+        self.path = os.path.join(os.getcwd(), '../figures', 'curve_fit', 'unit_data.pkl')
         if regenerate:
             self.df = pd.DataFrame(columns=self.columns)
             self.df.to_pickle(self.path)
@@ -491,7 +491,7 @@ def curve_fitting(split, plot_fit=False, plot_best=False, photometry=False):
     timer.check()
     std_list = []
     folder = 'photometry' if photometry else 'curve_fit'
-    session_data_path = os.path.join(os.getcwd(), 'figures', folder, split, 'session_data.pkl')
+    session_data_path = os.path.join(os.getcwd(), '../figures', folder, split, 'session_data.pkl')
 
     session_data_columns = ['session', 'centers', 'unfiltered_centers', 'sig', 'unfiltered_sig']
     session_data = pd.DataFrame(columns=session_data_columns)
@@ -721,7 +721,7 @@ def unit_filtering():
 def bar_plots(split, photometry=False):
     color_sets = backend.get_color_sets()
     folder = 'photometry' if photometry else 'curve_fit'
-    session_data_path = os.path.join(os.getcwd(), 'figures', folder, split, 'session_data.pkl')
+    session_data_path = os.path.join(os.getcwd(), '../figures', folder, split, 'session_data.pkl')
     data = pd.read_pickle(session_data_path)
     data_filtered = data[[len(l) > 0 for l in data.centers]]
     # filtered_sig=[]

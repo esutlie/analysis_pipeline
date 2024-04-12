@@ -34,14 +34,16 @@ def bins500ms(df):
     if 'spike_times' in df.keys():
         for _, row in df.iterrows():  # for each interval
             interval_bins = round((row.end-row.start)/bin_size)
-            activity = np.zeros([len(row.spike_times), interval_bins])
+            try:
+                activity = np.zeros([len(row.spike_times), interval_bins])
+            except Exception as e:
+                print()
             # activity = np.zeros([len(row.spike_times), len(t)])
             for j, arr in enumerate(row.spike_times):  # for each unit
                 for spike in arr:
                     start = np.searchsorted(t, spike-row.start)-1
                     end = min(start+len(slider), interval_bins)
                     activity[j, start:end] += slider[:end-start]
-                print()
             result.append(activity)
         return result
     else:

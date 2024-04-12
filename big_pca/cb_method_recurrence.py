@@ -100,18 +100,24 @@ def score_line(m, b, arr, scalar, show_plot=False, swath=True):
 
             # print(f'{np.sum(arr[valid]):.2f} inside out of {np.sum(arr):.2f} total. Score = {result}')
             if show_plot:
-                plt.imshow(scaled_arr.T, origin='lower')
+                plt.imshow(arr.T, origin='lower')
                 plt.colorbar()
                 y_lim = plt.gca().get_ylim()
+                x_lim = plt.gca().get_xlim()
                 plt.plot(y, c='k')
                 plt.plot(y_lower, c='r')
                 plt.plot(y_upper, c='r')
-                plt.ylim(y_lim)
-                plt.title(
-                    f'Slope: {m:.3f}  Intercept {b:.1f}  Score = {result:.3f}')
+                # plt.title(
+                #     f'Slope: {m:.3f}  Intercept {b:.1f}  Score = {result:.3f}')
                 # f'{np.sum(scaled_arr[valid]):.0f} inside out of {np.sum(scaled_arr):.0f} total. Score = {result:.3f}')
-                plt.xlabel('i')
-                plt.ylabel('j')
+                plt.xlabel('Interval 1 (sec)')
+                plt.ylabel('Interval 2 (sec)')
+                x_ticks = plt.gca().get_xticks()
+                y_ticks = plt.gca().get_yticks()
+                plt.xticks(x_ticks,x_ticks/100)
+                plt.yticks(y_ticks,y_ticks/100)
+                plt.ylim(y_lim)
+                plt.xlim(x_lim)
                 plt.show()
                 # print()
         else:
@@ -383,7 +389,8 @@ def recurrence_known(activity_list, selection, known_intercepts=None, known_slop
 
         score, m, b = regression(distance_matrix, scalar, show_plots=show_plots, show_final=False,
                                  intercept=b, slope=m)
-
+        if score>.55:
+            print()
         scores[i] = score
         slopes[i] = m
         intercepts[i] = b

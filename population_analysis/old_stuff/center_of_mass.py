@@ -9,7 +9,7 @@ import json
 import os
 from backend import get_data_path
 import time
-from isomap import get_phase, get_block
+from population_analysis.old_stuff.isomap import get_phase, get_block
 from thread_function import get_x
 from sklearn.preprocessing import minmax_scale
 from scipy.ndimage import convolve1d

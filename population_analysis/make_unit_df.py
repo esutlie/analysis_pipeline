@@ -1,12 +1,9 @@
 import backend
 import numpy as np
 from create_bins_df import create_precision_df
-from get_pca_space import get_pca_space, get_set_averages
 import matplotlib.pyplot as plt
-import math
 import random
-import json
-import os
+
 
 def make_unit_df():
     color_sets = backend.get_color_sets()

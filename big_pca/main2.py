@@ -8,13 +8,22 @@ from backend import load_data, make_intervals_df, get_session_list
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import normalize
 
+'''
+df = pi_events
+df[(df.key!='camera')&(df.key!='lick')&(df.key!='probability')]
+'''
+
 
 def run_pca(session):
-    test = True
+    test = False
     show_plots = False
     process = False
     print('started')
     spikes, pi_events, cluster_info = backend.load_data(session, photometry=False)
+
+    intervals_df, single = backend.make_intervals_df(pi_events, report_single=True)
+    if not single:
+        return None
 
     if test:
         spikes = spikes[spikes.cluster < 20]
@@ -22,19 +31,22 @@ def run_pca(session):
     high_pass_spikes = high_pass(spike_bins, .1)
     normalized_spikes = normalize(high_pass_spikes)
     normalized_spikes = normalized_spikes / np.std(normalized_spikes)
-    intervals_df = backend.make_intervals_df(pi_events)
 
     print('starting add one in')
     tic = backend.Timer()
     add_one_in(normalized_spikes, intervals_df, session, process=process, test=test, show_plots=show_plots)
     tic.tic('add one in full time')
+    return True
 
 
 if __name__ == '__main__':
+    run_pca('ES042_2024-02-27_bot168_0_g0')
+
     session_list = backend.get_session_list()
-    # run_pca('ES039_2024-02-28_bot144_1_g0')
-    # run_pca('ES029_2022-09-12_bot72_0_g0')
-    run_pca('ES039_2024-03-08_bot144_1_g0')
+    rng = np.random.default_rng()
+    rng.shuffle(session_list)
+    for session in session_list:
+        run_pca(session)
 
     # for session in session_list:
     #     run_pca(session)

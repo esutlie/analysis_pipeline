@@ -131,11 +131,19 @@ def session_summary(data, title):
     plt.show()
 
 
+
+
+
 def make_session_summaries(photometry=False):
-    files = backend.get_session_list(photometry=photometry)
-    for session in files:
+
+    files = ['ES037_2023-12-15_bot144_0_g0', 'ES039_2024-02-29_bot144_1_g0']
+    # files = backend.get_session_list(photometry=photometry)
+    for session in files[::-1]:
         _, pi_events, _ = backend.load_data(session, photometry=photometry)
-        session_summary(pi_events, session)
+        try:
+            session_summary(pi_events, session)
+        except Exception as e:
+            print(e)
 
 
 if __name__ == '__main__':

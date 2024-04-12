@@ -1,9 +1,8 @@
 import backend
 import numpy as np
 from create_bins_df import create_precision_df
-from get_pca_space import get_pca_space, get_set_averages, get_sets, single_pca_traj
+from population_analysis.old_stuff.get_pca_space import get_pca_space, get_set_averages, get_sets, single_pca_traj
 import matplotlib.pyplot as plt
-import math
 import matplotlib
 from scipy.ndimage import gaussian_filter1d
 

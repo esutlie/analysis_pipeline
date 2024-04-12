@@ -3,7 +3,11 @@ from .get_bools import get_bools
 from .min_dif import min_dif
 
 
-def get_trial_events(data, entry_tolerance=.5, exit_tolerance=2, include_unrewarded=True, travel_time=.5):
+def get_trial_events(data, entry_tolerance=.5, exit_tolerance=2, include_unrewarded=True, include_unlicked=False,
+                     travel_time=.5):
+    if data.task.iloc[10] == 'single_reward':
+        entry_tolerance = .05
+        include_unlicked = True
     [head, trial, cue, reward, lick, leave, start, port1, port2] = get_bools(data)
     entries = []
     exits = []
@@ -23,7 +27,8 @@ def get_trial_events(data, entry_tolerance=.5, exit_tolerance=2, include_unrewar
             continue
         entry_times = entry_times[(entry_times - available_time) > 0]
         entry_times = entry_times[min_dif(entry_times, exit_times) > entry_tolerance]
-        if not len(entry_times) or not len(lick_times) or not (len(reward_times) or include_unrewarded):
+        if not len(entry_times) or not (len(lick_times) or include_unlicked) or not (
+                len(reward_times) or include_unrewarded):
             continue
             # This triggers if there are no exits after the main entry, which happens if they stick
             # their butt in the opposite side and trigger the end of the trial early. Just omit these trials
@@ -35,11 +40,11 @@ def get_trial_events(data, entry_tolerance=.5, exit_tolerance=2, include_unrewar
         if first_exit - first_entry > 30:
             continue
 
-        reward_times = reward_times[(max(lick_times) - reward_times) > 0]
-
-        reward_times = lick_times[min_dif(reward_times, lick_times, return_index=True)[0]]
-        reward_times = reward_times[(reward_times - first_entry) > 0]
-        reward_times = reward_times[(first_exit - reward_times) > 0]
+        if len(lick_times):
+            reward_times = reward_times[(max(lick_times) - reward_times) > 0]
+            reward_times = lick_times[min_dif(reward_times, lick_times, return_index=True)[0]]
+            reward_times = reward_times[(reward_times - first_entry) > 0]
+            reward_times = reward_times[(first_exit - reward_times) > 0]
 
         entries.append(first_entry)
         exits.append(first_exit)

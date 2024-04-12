@@ -20,6 +20,19 @@ def trial_raster():
         # 'Background Port Exit': 'b',
     }
 
+def session_summary_example():
+    return {
+        'Optimal Leave Time': (.8,.8,.8),
+        '.4 r/s Block': set2[0],
+        '.8 r/s Block': set2[1],
+    }
+def session_summary_example_markers():
+    return {
+        'Optimal Leave Time': '_',
+        '.4 r/s Block': '|',
+        '.8 r/s Block': '|',
+    }
+
 
 def session_summary():
     return {
@@ -139,4 +152,5 @@ if __name__ == '__main__':
     # separate_legend(short_med_long(0), file_name='short_med_long_b1.png', marker='_')
     # separate_legend(short_med_long(1), file_name='short_med_long_b2.png', marker='_')
     # separate_legend(session_summary(), file_name='session_summary.png', marker=session_summary_markers())
-    separate_legend(dopamine_rewards(), file_name='dopamine_rewards.png', marker=dopamine_rewards_markers())
+    # separate_legend(dopamine_rewards(), file_name='dopamine_rewards.png', marker=dopamine_rewards_markers())
+    separate_legend(session_summary_example(), file_name='session_summary_example.png', marker=session_summary_example_markers())

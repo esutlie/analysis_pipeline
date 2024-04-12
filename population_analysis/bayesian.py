@@ -1,18 +1,10 @@
-from sklearn.manifold import Isomap
-from create_bins_df import create_precision_df, get_phase, get_block, get_x
+from create_bins_df import create_precision_df, get_block, get_x
 import backend
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib
-from sklearn.linear_model import LinearRegression, PoissonRegressor, GammaRegressor
-import json
+from sklearn.linear_model import LinearRegression
 import os
-from backend import get_data_path
-import time
-from sklearn.preprocessing import minmax_scale
-from scipy.ndimage import convolve1d
 import math
-from center_of_mass import get_mean
 from itertools import repeat
 import pandas as pd
 
