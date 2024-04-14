@@ -42,7 +42,7 @@ def recording_stats():
         single_df = this_df[this_df.task == "single_reward"]
         multi_mice = len(multi_df.mouse.unique())
         single_mice = len(single_df.mouse.unique())
-        print(f'# of sessions: {len(this_df)}')
+        print(f'# of sessions: multi {len(multi_df)} single {len(single_df)}')
         print(f'# of animals on each task {multi_mice} on multi, {single_mice} on single')
         print(f'# units per session: {this_df.num_units.mean()}')
         print(f'# of units per task: {multi_df.num_units.sum()} for multi, {single_df.num_units.sum()} for single')

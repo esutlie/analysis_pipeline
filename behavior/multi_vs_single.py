@@ -27,7 +27,11 @@ def task_compare_behavior():
         ax.set_xlabel('Optimal Leave Time (by trial)')
     plt.show()
 
-    sns.boxplot(entry_leave_df)
+    sns.boxplot(entry_leave_df, x='single_task', y='leave_from_entry', hue='block', palette='Set2')
+    plt.xlabel('')
+    plt.ylabel('Leave Time (sec)')
+    plt.xticks(plt.gca().get_xticks(), ['Multi Reward', 'Single Reward'])
+    plt.show()
 
 
 def examples():
@@ -59,5 +63,5 @@ def examples():
 
 
 if __name__ == '__main__':
-    # task_compare_behavior()
-    examples()
+    task_compare_behavior()
+    # examples()

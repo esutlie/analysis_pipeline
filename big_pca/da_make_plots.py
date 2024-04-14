@@ -12,7 +12,7 @@ import backend
 from backend import load_data, make_intervals_df, get_session_list
 from sklearn.preprocessing import normalize
 from big_pca.ca_extract_intervals import extract_intervals
-
+import scipy
 
 def make_plots(session):
     result = True
@@ -48,6 +48,8 @@ def make_recurrence_plots(session, n):
 
 def velocity_regression(session, n, master_df):
     session_df = master_df[master_df.session == session]
+    if session_df.single_task.iloc[0] == 1:
+        session_df = session_df[(session_df.phase == 0) | (session_df.phase == 3)]
     # velocity_df = pd.read_pickle(os.path.join('results', session + '_recurrence.pkl'))
     velocity_df = pd.read_pickle(os.path.join('results', session + '_recurrence_add_in.pkl'))
     if n >= len(velocity_df):
@@ -59,22 +61,64 @@ def velocity_regression(session, n, master_df):
     session_df = session_df.assign(log_velocity=np.log10(velocity))
     session_df = session_df.assign(score=scores)
     session_df['duration'] = session_df.end - session_df.start
-    df_non_start = session_df[(session_df.phase != 0) & (session_df.phase != 3)]
-    # df_non_start = session_df[(session_df.phase == 2)]
-    # df_best = df_non_start[df_non_start.score > .31]
+    if session_df.single_task.iloc[0] == 1:
+        df_non_start = session_df[(session_df.trial != 1) & (session_df.velocity < 2) & (session_df.velocity > .5)]
+        df_leave = df_non_start[df_non_start.leave_from_entry < 5]
+    else:
+        df_non_start = session_df[
+            (session_df.phase != 0) & (session_df.phase != 3) & (session_df.velocity < 2) & (session_df.velocity > .5)]
+        df_leave = df_non_start[(df_non_start.phase == 2) & (df_non_start.leave_from_reward < 4.5)
+                                & (df_non_start.trial_time < 12) & (df_non_start.log_velocity < .5)]
     df_best = df_non_start[df_non_start.score > np.quantile(df_non_start.score, .5)]
-    df_leave = df_non_start[
-        (df_non_start.phase == 2) & (df_non_start.leave_from_reward < 4.5) & (df_non_start.trial_time < 12)& (df_non_start.log_velocity < .5)]
-    df_late = df_non_start[df_non_start.group >= 4]
-    df_non_2 = df_best[(df_best.velocity > 2.2) | (df_best.velocity < 1.8)]
+    df_leave_best = df_leave[df_leave.score > np.quantile(df_leave.score, .5)]
     df_non_short = df_best[df_best.duration > .6]
-    options = ['leave_from_reward', 'block', 'trial_time', 'optimal_leave', 'recent_rate', 'leave_from_entry', 'start',
-               'phase']
 
-    # sns.histplot(df_non_start, x='log_velocity', binwidth=.05)
+    # y='log_velocity'
+    y = 'velocity'
+    # y_lim = [-.24, .24]
+    y_lim = [.5, 1.5]
+    block_order = np.sort(session_df.block.unique())
+    # sns.histplot(df_non_start, x='velocity')
+    # plt.show()
+    # sns.histplot(df_non_start, x='log_velocity', binwidth=.04)
     # plt.show()
     # sns.scatterplot(data=session_df, x="velocity", y="leave_from_reward", hue="trial_time")
     # plt.title('Velocity Plot')
+    # plt.show()
+    #
+    if session_df.single_task.iloc[0] != 1:
+        options = ['leave_from_reward', 'block', 'trial_time', 'optimal_leave', 'recent_rate', 'leave_from_entry']
+        x_labels = ['Leave Time From Reward', 'Block', 'Trial Time', 'Optimal Leave', 'Recent Reward Rate',
+                    'Leave Time From Entry']
+        df_to_use = df_leave
+        fig, axes = plt.subplots(2, 3, figsize=(10, 6))
+        for i, ax in enumerate(axes.flatten()):
+            if options[i] in ['phase', 'block', 'group']:
+                order = np.sort(df_to_use[options[i]].unique())
+                sns.boxplot(data=df_to_use, x=options[i], y=y, ax=ax, order=order, palette='Set2')
+                ax.set_xlabel(x_labels[i])
+                ax.set_ylabel('Velocity')
+                # ax.set_ylim(y_lim)
+            else:
+                sns.regplot(data=df_to_use, x=options[i], y=y, ax=ax)
+                # ax.set_ylim(y_lim)
+                ax.set_xlabel(x_labels[i])
+                ax.set_ylabel('Velocity')
+                _, _, r_value, _, _ = scipy.stats.linregress(df_to_use[options[i]], df_to_use[y])
+                ax.set_title(f'R-squared = {r_value**2:.4f}')
+        plt.tight_layout()
+        # plt.suptitle(f'{velocity_df.iloc[n].num_units} units')
+        plt.show()
+
+    # fig, axes = plt.subplots(2, 3, figsize=(10, 8))
+    # for i, ax in enumerate(axes.flatten()):
+    #     if options[i] in ['phase', 'block', 'group']:
+    #         sns.boxplot(data=df_best, x=options[i], y="log_velocity", ax=ax, palette='Set2', order=block_order)
+    #     else:
+    #         sns.regplot(data=df_best, x=options[i], y="log_velocity", ax=ax)
+    #         # ax.set_ylim([-1, 1])
+    # plt.tight_layout()
+    # plt.suptitle(f'{velocity_df.iloc[n].num_units} units')
     # plt.show()
 
     # With Scores in Hue
@@ -85,117 +129,73 @@ def velocity_regression(session, n, master_df):
     #     if options[i] in ['phase', 'block', 'group']:
     #         order = np.sort(df_to_use[options[i]].unique())
     #         sns.boxplot(data=df_to_use, x=options[i], y="log_velocity", ax=ax, order=order)
-    #         ax.set_ylim([-.25, .25])
+    #         # ax.set_ylim([-.25, .25])
     #     else:
-    #         sns.regplot(data=df_to_use, x=options[i], y="log_velocity", ax=ax)
-    #         ax.set_ylim([-.25, .25])
+    #         sns.scatterplot(data=df_to_use, x=options[i], y="log_velocity",hue='block', ax=ax)
+    #         # ax.set_ylim([-.25, .25])
     # plt.tight_layout()
     # # plt.suptitle(f'{velocity_df.iloc[n].num_units} units')
     # plt.show()
-    #
 
-    fig, axes = plt.subplots(1, 3, figsize=(10, 3))
-    df_to_use = df_leave
-    for i, ax in enumerate(axes.flatten()):
-        if options[i] in ['phase', 'block', 'group']:
-            order = np.sort(df_to_use[options[i]].unique())
-            sns.boxplot(data=df_to_use, x=options[i], y="log_velocity", ax=ax, order=order)
-            ax.set_ylim([-.25, .25])
-        else:
-            sns.scatterplot(data=df_to_use, x=options[i], y="log_velocity",hue='block', ax=ax)
-            ax.set_ylim([-.25, .25])
-    plt.tight_layout()
-    # plt.suptitle(f'{velocity_df.iloc[n].num_units} units')
-    plt.show()
+    if session_df.single_task.iloc[0] == 1:
+        options = ['leave_from_entry', 'block', 'recent_rate', 'optimal_leave', 'phase', 'start']
+        x_labels = ['Leave Time From Entry', 'Block', 'Recent Reward Rate', 'Optimal Leave', 'Phase', 'Start']
+        # fig, axes = plt.subplots(1, 3, figsize=(10, 3))
+        # df_to_use = df_leave
+        # for i, ax in enumerate(axes.flatten()):
+        #     if options[i] in ['phase', 'block', 'group']:
+        #         order = np.sort(df_to_use[options[i]].unique())
+        #         sns.boxplot(data=df_to_use, x=options[i], y="log_velocity", ax=ax, order=order, palette='Set2')
+        #         # ax.set_ylim([-.25, .25])
+        #     else:
+        #         sns.regplot(data=df_to_use, x=options[i], y="log_velocity", ax=ax)
+        #         # ax.set_ylim([-.25, .25])
+        # plt.tight_layout()
+        # # plt.suptitle(f'{velocity_df.iloc[n].num_units} units')
+        # plt.show()
 
+        fig, axes = plt.subplots(1, 4, figsize=(11, 4))
+        for i, ax in enumerate(axes.flatten()):
+            if options[i] in ['block']:
+                sns.boxplot(data=df_leave_best, x=options[i], y=y, ax=ax, palette='Set2',
+                            order=block_order)
+                ax.set_xlabel(x_labels[i])
+                ax.set_ylabel('Velocity')
+                # ax.set_ylim(y_lim)
+            elif options[i] in ['phase', 'group']:
+                sns.boxplot(data=df_leave_best, x=options[i], y=y, ax=ax)
+                ax.set_xlabel(x_labels[i])
+                ax.set_ylabel('Velocity')
+                # ax.set_ylim(y_lim)
+            elif options[i] in ['leave_from_entry']:
+                df_non_reward = df_leave_best[df_leave_best.phase == 3]
+                sns.regplot(data=df_non_reward, x=options[i], y=y, ax=ax)
+                ax.set_xlabel(x_labels[i])
+                ax.set_ylabel('Velocity')
+                # ax.set_ylim(y_lim)
+                _, _, r_value, _, _ = scipy.stats.linregress(df_leave_best[options[i]], df_leave_best[y])
+                ax.set_title(f'R-squared = {r_value ** 2:.4f}')
+            else:
+                sns.regplot(data=df_leave_best, x=options[i], y=y, ax=ax)
+                ax.set_xlabel(x_labels[i])
+                ax.set_ylabel('Velocity')
+                # ax.set_ylim(y_lim)
+                _, _, r_value, _, _ = scipy.stats.linregress(df_leave_best[options[i]], df_leave_best[y])
+                ax.set_title(f'R-squared = {r_value ** 2:.4f}')
+        plt.tight_layout()
+        # plt.suptitle(f'{velocity_df.iloc[n].num_units} units')
+        plt.show()
 
-    # fig, axes = plt.subplots(2, 3, figsize=(10, 8))
-    # for i, ax in enumerate(axes.flatten()):
-    #     if options[i] in ['phase', 'block', 'group']:
-    #         sns.boxplot(data=df_non_start, x=options[i], y="log_velocity", ax=ax)
-    #     else:
-    #         sns.scatterplot(data=df_non_start, x=options[i], y="log_velocity", hue='score', ax=ax)
-    #         ax.set_ylim([-1, 1])
-    # plt.tight_layout()
-    # plt.suptitle(f'{velocity_df.iloc[n].num_units} units')
-    # plt.show()
-
-    # fig, axes = plt.subplots(2, 3, figsize=(10, 8))
-    # for i, ax in enumerate(axes.flatten()):
-    #     if options[i] in ['phase', 'block', 'group']:
-    #         sns.boxplot(data=df_non_start, x=options[i], y="intercept", ax=ax)
-    #     else:
-    #         sns.scatterplot(data=df_non_start, x=options[i], y="intercept", hue='score', ax=ax)
-    #     ax.set_ylim([-100, 100])
-    # plt.tight_layout()
-    # plt.suptitle(f'{velocity_df.iloc[n].num_units} units')
-    # plt.show()
-
-    # # slope intercept relationship
-    # fig, axes = plt.subplots(2, 3, figsize=(15, 12))
-    # for i, ax in enumerate(axes.flatten()):
-    #     if options[i] in ['phase', 'block']:
-    #         sns.boxplot(data=df_non_start, x=options[i], y="log_velocity", ax=ax)
-    #     else:
-    #         sns.scatterplot(data=df_non_start, x='intercept', y='log_velocity', hue='score', ax=ax)
-    #         ax.set_xlim([-100, 100])
-    #     ax.set_ylim([-1, 1])
-    # plt.tight_layout()
-    # plt.suptitle(f'{velocity_df.iloc[n].num_units} units')
-    # plt.show()
-
-    # fig, axes = plt.subplots(2, 3, figsize=(10, 8))
-    # for i, ax in enumerate(axes.flatten()):
-    #     if options[i] in ['phase', 'block', 'group']:
-    #         sns.boxplot(data=df_best, x=options[i], y="log_velocity", ax=ax)
-    #     else:
-    #         sns.regplot(data=df_best, x=options[i], y="log_velocity", ax=ax)
-    #         # sns.scatterplot(data=df_early, x=options[i], y="log_velocity", hue='trial_time', ax=ax)
-    #     ax.set_ylim([-1, 1])
-    # plt.tight_layout()
-    # plt.suptitle(f'{velocity_df.iloc[n].num_units} units')
-    # plt.show()
-
-    # sns.scatterplot(data=session_df, x="intercept", y="leave_from_reward", hue="trial_time")
-    # plt.title('Intercept Plot')
-    # plt.show()
-
-    # fig, axes = plt.subplots(2, 3, figsize=(10, 8))
-    # for i, ax in enumerate(axes.flatten()):
-    #     if options[i] in ['phase', 'block']:
-    #         sns.boxplot(data=session_df, x=options[i], y="intercept", ax=ax)
-    #     else:
-    #         sns.scatterplot(data=session_df, x=options[i], y="intercept", ax=ax)
-    # plt.tight_layout()
-    # plt.show()
     return True
-
-
-def task_compare_behavior():
-    master_df = pd.read_pickle(os.path.join(os.path.dirname(os.getcwd()), '_master', 'data', 'master_data.pkl'))
-    entry_leave_df = master_df[((master_df.single_task == 0) & ((master_df.phase == 0) | (master_df.phase == 3))) |
-                               ((master_df.single_task == 1) & (master_df.phase == 3))]
-    sns.histplot(data=entry_leave_df[entry_leave_df.single_task == 1], x='leave_from_entry')
-    fig, axes = plt.subplots(1, 2, figsize=(10, 5))
-    for i, ax in enumerate(axes):
-        # sns.boxplot(data=entry_leave_df, x='single_task', y="leave_from_entry")
-        sns.scatterplot(data=entry_leave_df[entry_leave_df.single_task == i], x='optimal_leave', y="leave_from_entry",
-                        hue='block', ax=ax, s=2)
-        # x_lim, y_lim = ax.get_xlim(), ax.get_ylim()
-        ax.plot([-10, 30], [-10, 30], c='grey', zorder=-1)
-        ax.set_ylim([0, 25 if i == 0 else 15])
-        ax.set_xlim([0, 25 if i == 0 else 15])
-        ax.set_aspect(1)
-        ax.set_title('single task' if i == 1 else 'multi task')
-    plt.show()
-
 
 
 if __name__ == '__main__':
     master_df = pd.read_pickle(os.path.join(os.path.dirname(os.getcwd()), '_master', 'data', 'master_data.pkl'))
 
-    velocity_regression('ES029_2022-09-12_bot72_0_g0', 1, master_df)
-    velocity_regression('ES039_2024-03-08_bot144_1_g0', 2, master_df)
+    velocity_regression('ES029_2022-09-12_bot72_0_g0', 8, master_df)
     velocity_regression('ES039_2024-02-28_bot144_1_g0', 3, master_df)
+    velocity_regression('ES039_2024-03-08_bot144_1_g0', 2, master_df)
+    velocity_regression('ES041_2024-03-08_bot096_0_g0', 1, master_df)
+    velocity_regression('ES041_2024-03-08_bot096_1_g0', 3, master_df)
     # make_recurrence_plots('ES039_2024-03-08_bot144_1_g0', 2)
-    # make_plots('ES039_2024-02-28_bot144_1_g0')
+    # make_plots('ES044_2024-03-08_bot168_1_g0')
