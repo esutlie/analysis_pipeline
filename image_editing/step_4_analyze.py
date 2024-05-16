@@ -89,7 +89,9 @@ def add_to_data():
         probe_df = pd.read_pickle(probe_df_path)
         spikes, pi_events, cluster_info = backend.load_data(session)
         if not len(cluster_info) or not len(probe_df):
+            print(f'{mouse} not done')
             continue
+        print(f'{mouse} done')
 
         cluster_info['area'] = cluster_info.apply(
             lambda x: probe_df[(probe_df['shank'] == x['shank']) &

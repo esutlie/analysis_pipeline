@@ -27,7 +27,7 @@ def run_pca(session):
 if __name__ == '__main__':
     session_list = backend.get_session_list()
     # run_pca('ES039_2024-02-28_bot144_1_g0')
-    run_pca('ES029_2022-09-12_bot72_0_g0')
+    # run_pca('ES029_2022-09-12_bot72_0_g0')
 
-    # for session in session_list:
-    #     run_pca(session)
+    for session in session_list:
+        run_pca(session)

@@ -34,7 +34,7 @@ def make_intervals_df(pi_events, report_single=False):
                         'optimal_leave', 'single_task']
     intervals_df = pd.DataFrame(columns=interval_columns)
     for entry_time, exit_time, reward_list, trial, _ in zip(*get_trial_events(pi_events)):
-        reward_list = reward_list[reward_list<exit_time]
+        reward_list = reward_list[reward_list < exit_time]
         all_interval_starts = np.concatenate([[entry_time], reward_list])
         interval_starts = [entry_time] + reward_list.tolist()
         interval_ends = reward_list.tolist() + [exit_time]

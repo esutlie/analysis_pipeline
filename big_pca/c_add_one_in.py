@@ -10,7 +10,7 @@ import os
 import matplotlib.pyplot as plt
 
 
-def add_one_in(normalized_spikes, intervals_df, session, process=False, test=False, show_plots=False):
+def add_one_in(normalized_spikes, intervals_df, session, process=False, test=False, show_plots=False, shuffle=False):
     func = recurrence
     n_units = normalized_spikes.shape[0]
     columns = ['num_units', 'mean_score', 'std_score', 'arr', 'add_in']
@@ -20,13 +20,13 @@ def add_one_in(normalized_spikes, intervals_df, session, process=False, test=Fal
         add_in_list = res_df.add_in.iloc[-1]
     else:
         tic = backend.Timer()
-        add_in_list = []
+        add_in_list = [0,1]
         res_df = pd.DataFrame(columns=columns)
 
     if test:
         normalized_spikes = normalized_spikes[:5]
     if process:
-        executor = concurrent.futures.ProcessPoolExecutor(os.cpu_count() - 2)
+        executor = concurrent.futures.ProcessPoolExecutor(os.cpu_count()//2)
     i = 1
     while len(add_in_list) < n_units - 1:
         print(f'round {i} of add one in, {n_units} units')

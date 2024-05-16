@@ -39,7 +39,15 @@ def sigmoid(x, plots=False):
     return 1 / (1 + np.exp(-(x - .7) * 10))
 
 
-def manhattan_distance_matrix(a, b, bounds=False, clip_long=False, distribute=False):
+def manhattan_distance(a, b):
+    return np.sum(np.abs(a[:, :, np.newaxis] - b[:, np.newaxis, :]), axis=0)
+
+
+def euclidean_distance(a, b):
+    return np.sqrt(np.sum((a[:, :, np.newaxis] - b[:, np.newaxis, :]) ** 2, axis=0))
+
+
+def compute_distance_matrix(a, b, bounds=False, clip_long=False, distribute=False):
     if clip_long:
         multiplier = 1
         if len(a.T) > len(b.T) * multiplier:
@@ -47,7 +55,7 @@ def manhattan_distance_matrix(a, b, bounds=False, clip_long=False, distribute=Fa
         elif len(b.T) > len(a.T) * multiplier:
             b = b[:, :len(a.T) * multiplier].copy()
     try:
-        if bounds:
+        if bounds and not DISTANCE_METRIC:
             a -= a.min(axis=1)[:, None]
             a /= a.max(axis=1)[:, None]
             b -= b.min(axis=1)[:, None]
@@ -56,12 +64,17 @@ def manhattan_distance_matrix(a, b, bounds=False, clip_long=False, distribute=Fa
         print(e)
         print()
 
-    res = np.mean(np.abs(a[:, :, np.newaxis] - b[:, np.newaxis, :]), axis=0)
+    res = euclidean_distance(a, b)
+    # res = np.mean(np.abs(a[:, :, np.newaxis] - b[:, np.newaxis, :]), axis=0)
 
-    if distribute:
+    if distribute and not DISTANCE_METRIC:
         flat = res.flatten()
         flat = np.argsort(np.argsort(flat)) / (len(flat) - 1)
         res = np.reshape(flat, res.shape)
+    if DISTANCE_METRIC:
+        max_distance = np.sqrt(a.shape[0])
+        res /= max_distance
+
     return res
 
 
@@ -73,7 +86,7 @@ def score_line(m, b, arr, scalar, show_plot=False, swath=True):
     x = np.arange(arr.shape[0])
     y = line_maker(m, b, x)
     y_ind = np.floor(y).astype(int)
-    on_line = (y_ind < arr.shape[1]) & (y_ind > 0)
+    on_line = (y_ind < arr.shape[1]) & (y_ind >= 0)
     coverage_req = .15
     if not np.any(on_line) or np.sum(on_line) < coverage_req * arr.shape[0] \
             or (np.max(y_ind[on_line]) - np.min(y_ind[on_line])) < coverage_req * arr.shape[1]:
@@ -81,7 +94,8 @@ def score_line(m, b, arr, scalar, show_plot=False, swath=True):
 
     result = None
     swath_width = np.max(arr.shape) / 10
-    scaled_arr = scalar[:arr.shape[0], :arr.shape[1]] * arr
+    scaled_arr = arr.copy()
+    # scaled_arr = scalar[:arr.shape[0], :arr.shape[1]] * arr
 
     try:
         if swath:
@@ -114,8 +128,8 @@ def score_line(m, b, arr, scalar, show_plot=False, swath=True):
                 plt.ylabel('Interval 2 (sec)')
                 x_ticks = plt.gca().get_xticks()
                 y_ticks = plt.gca().get_yticks()
-                plt.xticks(x_ticks,x_ticks/100)
-                plt.yticks(y_ticks,y_ticks/100)
+                plt.xticks(x_ticks, x_ticks / 100)
+                plt.yticks(y_ticks, y_ticks / 100)
                 plt.ylim(y_lim)
                 plt.xlim(x_lim)
                 plt.show()
@@ -330,8 +344,8 @@ def recurrence(activity_list, show_plots=False):
                 continue
 
             # tic.tic('setup')
-            distance_matrix = manhattan_distance_matrix(activity_list[i], activity_list[j], bounds=True,
-                                                        clip_long=True, distribute=True)
+            distance_matrix = compute_distance_matrix(activity_list[i], activity_list[j], bounds=True,
+                                                      clip_long=True, distribute=True)
             # tic.tic('distance matrix')
             score, m, b = regression(distance_matrix, scalar, show_plots=show_plots)
             # tic.tic('regression')
@@ -371,7 +385,7 @@ def recurrence_known(activity_list, selection, known_intercepts=None, known_slop
     # tic.tic('start recurrence function')
     n = len(activity_list)
     _, scalar = make_relu(activity_list)
-    n_units = activity_list[0].shape[0]
+    # n_units = activity_list[0].shape[0]
     mean_DM = np.zeros([n])
     scores = np.zeros([n])
     slopes = np.zeros([n])
@@ -379,8 +393,8 @@ def recurrence_known(activity_list, selection, known_intercepts=None, known_slop
     for i in range(n):
         b = known_intercepts[i] if known_intercepts is not None else None
         m = known_slopes[i] if known_slopes is not None else None
-        distance_matrix = manhattan_distance_matrix(activity_list[i], activity_list[selection], bounds=True,
-                                                    clip_long=True, distribute=True)
+        distance_matrix = compute_distance_matrix(activity_list[i], activity_list[selection], bounds=True,
+                                                  clip_long=True, distribute=True)
 
         # plt.imshow(distance_matrix.T, origin='lower')
         # plt.ylabel(f'{selection} (reference)')
@@ -388,9 +402,9 @@ def recurrence_known(activity_list, selection, known_intercepts=None, known_slop
         # plt.show()
 
         score, m, b = regression(distance_matrix, scalar, show_plots=show_plots, show_final=False,
-                                 intercept=b, slope=m)
-        if score>.55:
-            print()
+                                 intercept=b, slope=None)
+        # if score > .55:
+        #     print()
         scores[i] = score
         slopes[i] = m
         intercepts[i] = b

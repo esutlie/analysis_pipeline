@@ -192,10 +192,10 @@ def velocity_regression(session, n, master_df):
 if __name__ == '__main__':
     master_df = pd.read_pickle(os.path.join(os.path.dirname(os.getcwd()), '_master', 'data', 'master_data.pkl'))
 
-    velocity_regression('ES029_2022-09-12_bot72_0_g0', 8, master_df)
-    velocity_regression('ES039_2024-02-28_bot144_1_g0', 3, master_df)
-    velocity_regression('ES039_2024-03-08_bot144_1_g0', 2, master_df)
-    velocity_regression('ES041_2024-03-08_bot096_0_g0', 1, master_df)
-    velocity_regression('ES041_2024-03-08_bot096_1_g0', 3, master_df)
-    # make_recurrence_plots('ES039_2024-03-08_bot144_1_g0', 2)
+    # velocity_regression('ES029_2022-09-12_bot72_0_g0', 8, master_df)
+    # velocity_regression('ES039_2024-02-28_bot144_1_g0', 3, master_df)
+    # velocity_regression('ES039_2024-03-08_bot144_1_g0', 2, master_df)
+    # velocity_regression('ES041_2024-03-08_bot096_0_g0', 1, master_df)
+    # velocity_regression('ES041_2024-03-08_bot096_1_g0', 3, master_df)
+    make_recurrence_plots('ES039_2024-03-08_bot144_1_g0', 2)
     # make_plots('ES044_2024-03-08_bot168_1_g0')
