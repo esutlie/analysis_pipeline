@@ -13,9 +13,9 @@ https://github.com/glichtner/pystackreg
 """
 
 
-def align_pics():
+def align_pics(regenerate=False, reverse=True):
     pic_dict = {}
-    pics, file_names = load_pictures()
+    pics, file_names = load_pictures("pics")
     for pic, name in zip(pics, file_names):
         for delimiter in ['_', '.']:
             name = " ".join(name.split(delimiter))
@@ -26,21 +26,24 @@ def align_pics():
             else:
                 pic_dict[name[0]] = [np.asarray(pic)]
     for name, mouse_pics in pic_dict.items():
+        save_path = os.path.join(os.getcwd(), 'reg_pics', name)
+        if os.path.exists(save_path) and not regenerate:
+            continue
         print(f'starting {name}...   ', end='')
-        rev_mouse_pics = mouse_pics[::-1]
-        probe_stack = np.stack([p[:, :, 0] for p in rev_mouse_pics])
-        null_stack = np.stack([p[:, :, 1] for p in rev_mouse_pics])
-        blue_stack = np.stack([p[:, :, 2] for p in rev_mouse_pics])
+        img_stack = mouse_pics[::-1] if reverse else mouse_pics
+        probe_stack = np.stack([p[:, :, 0] for p in img_stack])
+        null_stack = np.stack([p[:, :, 1] for p in img_stack])
+        blue_stack = np.stack([p[:, :, 2] for p in img_stack])
         # plt.imshow(probe_stack[24,:,::-1])
         # plt.show()
         probe_com = backend.center_of_mass(np.max(probe_stack, axis=1), axis=1)
         slice_com = backend.center_of_mass(np.max(blue_stack, axis=1), axis=1)
-        dif = probe_com-slice_com
+        dif = probe_com - slice_com
         for i, diff in enumerate(dif):
-            if diff*np.mean(dif)<0:
-                probe_stack[i] = probe_stack[i,:,::-1]
-                blue_stack[i] = blue_stack[i,:,::-1]
-                null_stack[i] = null_stack[i,:,::-1]
+            if diff * np.mean(dif) < 0:
+                probe_stack[i] = probe_stack[i, :, ::-1]
+                blue_stack[i] = blue_stack[i, :, ::-1]
+                null_stack[i] = null_stack[i, :, ::-1]
 
         # for i in range(len(blue_stack)):
         #     blue_stack[i][np.where(blue_stack[i] >= 235)] = 0
@@ -55,7 +58,7 @@ def align_pics():
         #     # time.sleep(.5)
         # print()
 
-        sr = StackReg(StackReg.RIGID_BODY)
+        sr = StackReg(StackReg.TRANSLATION)
         tmats = sr.register_stack(blue_stack, reference='previous')
 
         blue_reg = sr.transform_stack(blue_stack)
@@ -74,7 +77,6 @@ def align_pics():
             arr = np.transpose(np.stack([probe_reg[i], null_reg[i], blue_reg[i]]), (1, 2, 0))
             im = Image.fromarray(arr.astype(np.uint8), 'RGB')
             save_name = f'{name}_reg_s0{i}.jpg' if i >= 10 else f'{name}_reg_s00{i}.jpg'
-            save_path = os.path.join(os.getcwd(), 'reg_pics', name)
             if not os.path.exists(save_path):
                 os.makedirs(save_path)
             im.save(os.path.join(save_path, save_name))
@@ -83,4 +85,4 @@ def align_pics():
 
 plot = False
 if __name__ == '__main__':
-    align_pics()
+    align_pics(regenerate=False, reverse=True)

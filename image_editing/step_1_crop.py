@@ -16,12 +16,12 @@ a different naming system.
 """
 
 
-def crop_slices(show_pics=False, save_pics=False):
-    slice_size = [2000, 1500]
+def crop_slices(show_pics=False, save_pics=False, mouse=None):
     pictures, names = load_pictures()
+    slice_size = [2000, 1500]
     mouse_names = [name[:5] for name in names]
     mice = np.unique(mouse_names)
-    mouse_pics = dict(zip(mice, [[]] * len(mice)))
+    mouse_pics = dict(zip(mice, [[]] * len(mice))) if mouse is None else {mouse: []}
     # mouse_pic_names = dict(zip(mice, [[]] * len(mice)))
     for i, picture in enumerate(pictures):
         count = 0
@@ -29,17 +29,24 @@ def crop_slices(show_pics=False, save_pics=False):
         name = names[i]
         if (name[-4:] == 'jpeg') or (name[-3:] == 'jpg'):
             continue
+        if mouse is not None and mouse not in name:
+            continue
+        if picture.size[0] > 10000:
+            picture = picture.resize((int(picture.size[0] * .65), int(picture.size[1] * .65)))
         arr = np.array(picture)
         arr = np.flip(arr, axis=1)
-        row_mean = np.mean(arr[:, :, 2], axis=1)
-        row_mean_filter = savgol_filter(row_mean, 1001, 3)
+        print(arr.shape)
         if save_pics:
             im = Image.fromarray(arr)
             im.save(os.path.join('pics', f'{name[:-4]}.jpg'))
-        # plt.plot(row_mean)
-        # plt.plot(row_mean_filter)
-        # plt.title(name)
-        # plt.show()
+
+        row_mean = np.mean(arr[:, :, 2], axis=1)
+        row_mean_filter = savgol_filter(row_mean, int(arr.shape[0] / 2), 3)
+
+        plt.plot(row_mean)
+        plt.plot(row_mean_filter)
+        plt.title(name)
+        plt.show()
 
         peaks = argrelmax(row_mean_filter, order=1000, mode='clip')[0]
         y_bounds = [[int(val - slice_size[1] / 2), int(val + slice_size[1] / 2)] for val in peaks]
@@ -50,17 +57,23 @@ def crop_slices(show_pics=False, save_pics=False):
                 y_bound = [b - (y_bound[1] - len(arr)) for b in y_bound]
 
             half_pic = arr[y_bound[0]:y_bound[1], :, :]
-            col_mean = np.mean(half_pic[:, :, 2], axis=0)
-            col_mean_filter = savgol_filter(col_mean, 2001, 3)
+            half_pic_filter = half_pic.copy()
+            half_pic_filter[half_pic_filter[:,:,2] > 150, 2] = np.mean(half_pic_filter[:,:,2])
+            col_mean = np.mean(half_pic_filter[:, :, 2], axis=0)
+            col_mean_filter = savgol_filter(
+                np.pad(col_mean, (1000, 1000), 'constant'),
+                int(arr.shape[1] / 4),
+                3
+            )[1000:-1000]
 
-            # plt.imshow(half_pic)
-            # plt.title(name)
-            # plt.show()
+            plt.imshow(half_pic_filter)
+            plt.title(name)
+            plt.show()
 
-            # plt.plot(col_mean)
-            # plt.plot(col_mean_filter)
-            # plt.title(name)
-            # plt.show()
+            plt.plot(col_mean)
+            plt.plot(col_mean_filter)
+            plt.title(name)
+            plt.show()
 
             peaks = argrelmax(col_mean_filter, order=300, mode='clip')[0]
             x_bounds = [[int(val - slice_size[0] / 2), int(val + slice_size[0] / 2)] for val in peaks]
@@ -91,4 +104,4 @@ def crop_slices(show_pics=False, save_pics=False):
 
 
 if __name__ == '__main__':
-    crop_slices(show_pics=False, save_pics=True)
+    crop_slices(show_pics=False, save_pics=True, mouse='ES047')

@@ -20,12 +20,15 @@ def trial_raster():
         # 'Background Port Exit': 'b',
     }
 
+
 def session_summary_example():
     return {
-        'Optimal Leave Time': (.8,.8,.8),
+        'Optimal Leave Time': (.8, .8, .8),
         '.4 r/s Block': set2[0],
         '.8 r/s Block': set2[1],
     }
+
+
 def session_summary_example_markers():
     return {
         'Optimal Leave Time': '_',
@@ -111,6 +114,21 @@ def pca_cluster_activity():
     }
 
 
+def soon_later():
+    import numpy as np
+    return {
+        'Sooner Smaller Pursuit': np.array([68, 170, 153]) / 255,
+        'Larger Later Pursuit': np.array([111, 99, 171]) / 255,
+    }
+
+
+def soon_later_markers():
+    return {
+        'Sooner Smaller Pursuit': '_',
+        'Larger Later Pursuit': '_',
+    }
+
+
 def separate_legend(entries, file_name=None, marker=None):
     properties = {
         'marker': marker,
@@ -142,15 +160,60 @@ def separate_legend(entries, file_name=None, marker=None):
         plt.show()
 
 
+def new_raster():
+    return {
+        'Entry': 'k',
+        'Exit': 'r',
+        'Reward': 'blue',
+        'Spikes': 'grey',
+    }
+
+
+def quantiles():
+    return {
+        '1st Quantile': 'purple',
+        '2nd Quantile': 'blue',
+        '3rd Quantile': 'green',
+        '4th Quantile': 'orange',
+        '5th Quantile': 'red',
+    }
+
+def blocks_new_quant():
+    return {
+        'Low Block': 'purple',
+        'High Block': 'blue',
+    }
+
+def black_gray_raster():
+    return {
+        'Interval Spikes': 'k',
+        'Surrounding Spikes': 'grey',
+        'Reward Events': 'tomato',
+    }
+
+def black_gray_raster_markers():
+    return {
+        'Interval Spikes': '|',
+        'Surrounding Spikes': '|',
+        'Reward Events': '.',
+    }
+
+
 if __name__ == '__main__':
     save_legend = True
     # separate_legend(trial_raster(), file_name='legend_trial_raster.png')
     # separate_legend(reward_raster(), file_name='legend_reward_raster.png')
     # separate_legend(blocks(), file_name='block_dots.png', marker='.')
     # separate_legend(blocks(), file_name='block_lines.png', marker='_')
-    separate_legend(pca_cluster_activity(), file_name='pca_cluster_activity.png', marker='_')
+    # separate_legend(pca_cluster_activity(), file_name='pca_cluster_activity.png', marker='_')
     # separate_legend(short_med_long(0), file_name='short_med_long_b1.png', marker='_')
     # separate_legend(short_med_long(1), file_name='short_med_long_b2.png', marker='_')
     # separate_legend(session_summary(), file_name='session_summary.png', marker=session_summary_markers())
     # separate_legend(dopamine_rewards(), file_name='dopamine_rewards.png', marker=dopamine_rewards_markers())
     # separate_legend(session_summary_example(), file_name='session_summary_example.png', marker=session_summary_example_markers())
+    # separate_legend(soon_later(), file_name='soon_later.png', marker=soon_later_markers())
+    # separate_legend(new_raster(), file_name='new_raster.png', marker='|')
+    # separate_legend(quantiles(), file_name='quantiles.png', marker='_')
+    # separate_legend(blocks_new_quant(), file_name='blocks_new_quant.png', marker='_')
+    separate_legend(black_gray_raster(), file_name='black_gray_raster.png', marker=black_gray_raster_markers())
+
