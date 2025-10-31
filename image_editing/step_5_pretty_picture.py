@@ -7,6 +7,7 @@ import numpy as np
 import backend
 import nrrd
 from matplotlib.colors import ListedColormap, LinearSegmentedColormap
+mpl.rcParams['figure.dpi'] = 300
 
 
 # def atlas_colormap():
@@ -81,5 +82,5 @@ def make_atlas_pic(mice):
 
 if __name__ == '__main__':
     # [make_atlas_pic([mouse]) for mouse in ['ES024', 'ES025', 'ES029', 'ES030', 'ES031']]
-    # make_atlas_pic(['ES024', 'ES025', 'ES029', 'ES030', 'ES031', 'ES032', 'ES037', 'ES039'])
-    make_atlas_pic(['ES044'])
+    make_atlas_pic(['ES024', 'ES025', 'ES029', 'ES030', 'ES031', 'ES032', 'ES037', 'ES039'])
+    # make_atlas_pic(['ES044'])

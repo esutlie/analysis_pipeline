@@ -114,6 +114,30 @@ def analyze_probe(mouse_list=None):
         probe_df.to_pickle(os.path.join(save_dir, f'{mouse}.pkl'))
 
 
+def get_insertion_data(mouse_list=None):
+    save_dir = os.path.join(os.getcwd(), 'insertion_info')
+    columns = ['subject', 'shank', 'insertion_coords', 'terminus_coords', 'in_brain_length']
+    data_collect = []
+    for mouse in sides.keys():
+        if mouse_list is not None and mouse not in mouse_list:
+            continue
+
+        for shank in range(4):
+            path = os.path.join(os.getcwd(), 'reg_pics', mouse, 'probes', f'probe {shank}.pkl')
+            if os.path.exists(path):
+                with open(path, 'rb') as fp:
+                    dic = pickle.load(fp)
+
+                insertion_coords = dic['data']['insertion_coords']
+                termination_coords = dic['data']['terminus_coords']
+                in_brain_length = dic['data']['probe_length']
+                data_collect.append([mouse, shank, insertion_coords, termination_coords, in_brain_length])
+    insertion_df = pd.DataFrame(data_collect, columns=columns)
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+    insertion_df.to_pickle(os.path.join(save_dir, 'insertion_data.pkl'))
+
+
 def add_to_data(mouse_list=None):
     files = backend.get_session_list()
     for session in files:
@@ -147,6 +171,9 @@ def add_to_data(mouse_list=None):
 if __name__ == '__main__':
     # mice = ['ES024', 'ES025', 'ES029', 'ES030', 'ES031', 'ES032', 'ES037', 'ES039', 'ES041', 'ES042',
     #         'ES046', 'ES058', 'ES059']
-    mice = ['ES047']
-    analyze_probe(mice)
+    # mice = ['ES047']
+    # analyze_probe(mice)
     # add_to_data(mice)
+    mice = ['ES024', 'ES025', 'ES029', 'ES030', 'ES031', 'ES032', 'ES039',
+            'ES045', 'ES046', 'ES047']
+    get_insertion_data(mice)
